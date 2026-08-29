@@ -1,0 +1,8 @@
+{
+  "__comment": "1.7.10/GTNHLib port. Upstream 1.12 used forge_marker + defaults + 'normal'/'inventory' variants; GTNHLib's StateDeserializer ignores forge_marker/defaults and parses variant keys as 'prop=value' pairs, so the match-all key must be \"\" and the model must be named explicitly.",
+  "variants": {
+    "": {
+      "model": "danknull:block/danknull_dock"
+    }
+  }
+}

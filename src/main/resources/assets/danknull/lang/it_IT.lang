@@ -1,0 +1,62 @@
+//dank/null IT Italian Localizations
+
+//Creative Tab
+itemGroup.danknull=/dank/null
+
+//Items
+item.dank_null_0.name=/dank/null/
+item.dank_null_1.name=/dank/null/MK II
+item.dank_null_2.name=/dank/null/MK III
+item.dank_null_3.name=/dank/null/MK IV
+item.dank_null_4.name=/dank/null/MK V
+item.dank_null_5.name=/dank/null/MK VI
+item.dank_null_6.name=/dank/null/Creativa
+item.dank_null_panel.name=Pannello /dank/null di Pietrarossa
+item.dank_null_panel_0.name=Pannello /dank/null di Pietrarossa
+item.dank_null_panel_1.name=Pannello /dank/null Panel di Lapislazzuli
+item.dank_null_panel_2.name=Pannello /dank/null Panel di Ferro
+item.dank_null_panel_3.name=Pannello /dank/null Panel di Oro
+item.dank_null_panel_4.name=Pannello /dank/null Panel di Diamante
+item.dank_null_panel_5.name=Pannello /dank/null Panel di Smeraldo
+
+//Blocks
+tile.danknull_dock.name=Stazione di attacco per /dank/null
+
+
+//KeyBindings
+key.categories.danknull=/dank/null
+key.next_item.desc=Cicla all'oggetto successivo nella /dank/null
+key.previous_item.desc=Cicla all'oggetto precedente nella /dank/null
+key.open_danknull.desc=Apri la /dank/null più vicina
+
+//Misc
+dn.selected_item.desc=Oggetto Selezionato
+dn.count.desc=Conto
+dn.extract.desc=Estrai
+dn.place.desc=Piazza
+dn.extract_mode.desc=Modalità di Estrazione
+dn.placement_mode.desc=Modalità di costruzione
+dn.infinite.desc=Infinito
+dn.no_open_keybind.desc=Nessuna scorciatoia da tastiera impostata
+dn.open_with.desc=Apri con
+dn.ore_dictionary.desc=Ore Dictionary
+dn.enabled.desc=Attivato
+dn.disabled.desc=Disattivato
+dn.not_oredicted.desc=Oggetto senza Ore Dictionary
+dn.ctrl_click_change.desc=Ctrl+Click per cambiare la modalità di Estrazione
+dn.o_click_toggle.desc=O+Click per modificare la modalità di OreDict
+dn.p_click_toggle.desc=P+Click per modificare la modalità di Costruzione
+dn.alt_click_set.desc=Alt+Click per impostare come oggetto selezionato
+dn.selected.desc=Selezionato
+dn.will.desc=è
+dn.from_slot.desc=da questo slot
+dn.do.desc=Fa
+dn.not_extract.desc=non estrarre
+dn.extract_all_but.desc=estrai tutto eccetto
+dn.extract_all.desc=estrai tutto
+dn.right_click_with.desc=Click-Destro con
+dn.empty_hand_open.desc=mano vuota per aprire la GUI
+dn.docked.desc=Ancorata
+dn.chisel_varient.desc=Variante
+dn.lock.desc=Blocco
+dn.unlock.desc=Sblocco

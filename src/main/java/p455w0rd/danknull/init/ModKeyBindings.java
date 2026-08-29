@@ -1,0 +1,69 @@
+package p455w0rd.danknull.init;
+
+import net.minecraft.client.settings.KeyBinding;
+
+import org.lwjgl.input.Keyboard;
+
+import cpw.mods.fml.client.registry.ClientRegistry;
+import cpw.mods.fml.relauncher.Side;
+import cpw.mods.fml.relauncher.SideOnly;
+
+/**
+ * @author p455w0rd
+ */
+@SideOnly(Side.CLIENT)
+public class ModKeyBindings {
+
+    private static final String CATEGORY = "key.categories.danknull";
+    private static KeyBinding nextItem;
+    private static KeyBinding previousItem;
+    private static KeyBinding openDankNull;
+    private static KeyBinding toggleHUDOverlay;
+
+    public static void register() {
+        ClientRegistry.registerKeyBinding(getNextItemKeyBind());
+        ClientRegistry.registerKeyBinding(getPreviousItemKeyBind());
+        ClientRegistry.registerKeyBinding(getOpenDankNullKeyBind());
+        ClientRegistry.registerKeyBinding(getToggleHUDKeyBind());
+    }
+
+    /**
+     * 1.7.10's {@code KeyBinding} spells 1.12's {@code isKeyDown()} as {@code getIsKeyPressed()}; both mean "the key
+     * is currently held", as opposed to {@code isPressed()}, which consumes a queued press.
+     */
+    public static boolean isAnyModKeybindPressed() {
+        return getNextItemKeyBind().getIsKeyPressed() || //@formatter:off
+                getPreviousItemKeyBind().getIsKeyPressed() ||
+                getOpenDankNullKeyBind().getIsKeyPressed() ||
+                getToggleHUDKeyBind().getIsKeyPressed();//@formatter:on
+    }
+
+    public static KeyBinding getNextItemKeyBind() {
+        if (nextItem == null) {
+            nextItem = new KeyBinding("key.next_item.desc", Keyboard.CHAR_NONE, CATEGORY);
+        }
+        return nextItem;
+    }
+
+    public static KeyBinding getPreviousItemKeyBind() {
+        if (previousItem == null) {
+            previousItem = new KeyBinding("key.previous_item.desc", Keyboard.CHAR_NONE, CATEGORY);
+        }
+        return previousItem;
+    }
+
+    public static KeyBinding getOpenDankNullKeyBind() {
+        if (openDankNull == null) {
+            openDankNull = new KeyBinding("key.open_danknull.desc", Keyboard.CHAR_NONE, CATEGORY);
+        }
+        return openDankNull;
+    }
+
+    public static KeyBinding getToggleHUDKeyBind() {
+        if (toggleHUDOverlay == null) {
+            toggleHUDOverlay = new KeyBinding("key.togglehud.desc", Keyboard.CHAR_NONE, CATEGORY);
+        }
+        return toggleHUDOverlay;
+    }
+
+}

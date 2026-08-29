@@ -1,0 +1,326 @@
+package p455w0rd.danknull.blocks;
+
+import static p455w0rd.danknull.util.DankNullStackUtils.isEmpty;
+
+import java.util.ArrayList;
+
+import net.minecraft.block.BlockContainer;
+import net.minecraft.block.material.Material;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.AxisAlignedBB;
+import net.minecraft.util.MathHelper;
+import net.minecraft.util.MovingObjectPosition;
+import net.minecraft.world.IBlockAccess;
+import net.minecraft.world.World;
+import net.minecraftforge.common.util.ForgeDirection;
+
+import com.gtnewhorizon.gtnhlib.api.IBlockModelProvider;
+import com.gtnewhorizon.gtnhlib.client.model.BakeData;
+import com.gtnewhorizon.gtnhlib.client.model.BakedModelQuadContext;
+import com.gtnewhorizon.gtnhlib.client.model.baked.BakedModel;
+import com.gtnewhorizon.gtnhlib.client.model.loading.ModelRegistry;
+import com.gtnewhorizon.gtnhlib.client.model.loading.ResourceLoc;
+
+import cpw.mods.fml.relauncher.Side;
+import cpw.mods.fml.relauncher.SideOnly;
+import p455w0rd.danknull.DankNull;
+import p455w0rd.danknull.blocks.tiles.TileDankNullDock;
+import p455w0rd.danknull.init.ModCreativeTab;
+import p455w0rd.danknull.init.ModGlobals;
+import p455w0rd.danknull.init.ModGlobals.NBT;
+import p455w0rd.danknull.init.ModGuiHandler;
+import p455w0rd.danknull.util.DankNullUtils;
+
+/**
+ * The /dank/null Docking Station.
+ *
+ * <p>
+ * 1.12 kept the dock's orientation in an {@code IBlockState} property and rendered it from a baked JSON model.
+ * 1.7.10 has neither, so the orientation lives in block metadata:
+ * </p>
+ *
+ * <pre>
+ * metadata layout (4 bits)
+ *   bits 0-1 : horizontal direction the FRONT of the dock faces
+ *              0 = SOUTH (+Z), 1 = WEST (-X), 2 = NORTH (-Z), 3 = EAST (+X)
+ *   bits 2-3 : unused
+ * </pre>
+ *
+ * <p>
+ * The ItemBlock always places metadata 0; the facing is stamped on in
+ * {@link #onBlockPlacedBy(World, int, int, int, EntityLivingBase, ItemStack)} so that the front points back at
+ * whoever placed it. {@link #damageDropped(int)} is therefore always 0 and every dock is the same item.
+ * </p>
+ *
+ * <p>
+ * Note that {@code blockstates/danknull_dock.json} currently uses GTNHLib's match-all {@code ""} variant, so the
+ * facing is stored but not yet rendered; a render pass that wants it only has to add {@code meta=0..3} variants
+ * with a {@code y} rotation, no extra registration needed.
+ * </p>
+ *
+ * @author p455w0rd
+ */
+public class BlockDankNullDock extends BlockContainer implements IBlockModelProvider {
+
+    /** Registry / unlocalized name. Matches {@code assets/danknull/blockstates/danknull_dock.json}. */
+    public static final String NAME = "danknull_dock";
+
+    private static final int FACING_MASK = 3;
+
+    /**
+     * Baked model, resolved straight from the model JSON rather than through the blockstate file.
+     *
+     * <p>
+     * GTNHLib normally picks the model by reading {@code assets/danknull/blockstates/danknull_dock.json}, but in
+     * a dev environment that lookup fails: the mod's own resource pack reports the blockstate as existing and then
+     * cannot open it, even though {@code ZipFile.getEntry} finds the entry in the very same jar (sibling paths such
+     * as {@code models/block/danknull_dock.json} load fine, and other mods' blockstates load fine). Since this block
+     * has exactly one model and no variants, {@link IBlockModelProvider} lets us bypass blockstate resolution
+     * entirely and bake the model directly - which is both immune to that quirk and strictly less work at runtime.
+     * </p>
+     */
+    private static volatile BakedModel bakedModel;
+
+    /** Called on resource reload; the next render re-bakes against the new atlas. */
+    public static void invalidateModel() {
+        bakedModel = null;
+    }
+
+    @Override
+    public BakedModel getModel(final BakedModelQuadContext context) {
+        BakedModel model = bakedModel;
+        if (model == null) {
+            model = ModelRegistry.getJSONModel(ResourceLoc.ModelLoc.fromStr(ModGlobals.MODID + ":block/" + NAME))
+                .bake(BakeData.IDENTITY);
+            bakedModel = model;
+        }
+        return model;
+    }
+
+    private static final double EMPTY_HEIGHT = 3.0D * 0.0625D;
+    private static final double DOCKED_HEIGHT = 12.0D * 0.0625D;
+
+    public BlockDankNullDock() {
+        super(Material.iron);
+        setBlockName(NAME);
+        // Only used for particles / the break animation - the block itself is drawn from the JSON model, which
+        // references the same texture as "danknull:blocks/dock/base".
+        setBlockTextureName(ModGlobals.MODID + ":dock/base");
+        setResistance(6000000.0F);
+        setHardness(10.0F);
+        // 1.7.10's ItemBlock.getCreativeTab() delegates to the block, so the tab has to be set here rather than on
+        // ItemBlockDankNullDock.
+        setCreativeTab(ModCreativeTab.TAB);
+        // As upstream: the dock is not a full cube, so it borrows its neighbours' brightness rather than lighting
+        // its own (occupied) cell. Same trick vanilla slabs use.
+        setLightOpacity(255);
+        useNeighborBrightness = true;
+    }
+
+    /** Decodes the facing stored in the low two bits of the metadata. */
+    public static ForgeDirection getFacing(final int meta) {
+        switch (meta & FACING_MASK) {
+            case 1:
+                return ForgeDirection.WEST;
+            case 2:
+                return ForgeDirection.NORTH;
+            case 3:
+                return ForgeDirection.EAST;
+            default:
+                return ForgeDirection.SOUTH;
+        }
+    }
+
+    public static ForgeDirection getFacing(final IBlockAccess world, final int x, final int y, final int z) {
+        return getFacing(world.getBlockMetadata(x, y, z));
+    }
+
+    @Override
+    public TileEntity createNewTileEntity(final World world, final int meta) {
+        return new TileDankNullDock();
+    }
+
+    private TileDankNullDock getTE(final IBlockAccess world, final int x, final int y, final int z) {
+        final TileEntity te = world.getTileEntity(x, y, z);
+        if (te instanceof TileDankNullDock) {
+            return (TileDankNullDock) te;
+        }
+        return null;
+    }
+
+    /** True when there is no /dank/null sitting in the dock (which also selects the shorter bounding box). */
+    private boolean isEmptyDock(final IBlockAccess world, final int x, final int y, final int z) {
+        final TileDankNullDock te = getTE(world, x, y, z);
+        return te == null || isEmpty(te.getDankNull());
+    }
+
+    // ------------------------------------------------------------------
+    // shape
+    // ------------------------------------------------------------------
+
+    @Override
+    public void setBlockBoundsBasedOnState(final IBlockAccess world, final int x, final int y, final int z) {
+        final double height = isEmptyDock(world, x, y, z) ? EMPTY_HEIGHT : DOCKED_HEIGHT;
+        setBlockBounds(0.0F, 0.0F, 0.0F, 1.0F, (float) height, 1.0F);
+    }
+
+    @Override
+    public void setBlockBoundsForItemRender() {
+        setBlockBounds(0.0F, 0.0F, 0.0F, 1.0F, (float) EMPTY_HEIGHT, 1.0F);
+    }
+
+    @Override
+    public AxisAlignedBB getCollisionBoundingBoxFromPool(final World world, final int x, final int y, final int z) {
+        final double height = isEmptyDock(world, x, y, z) ? EMPTY_HEIGHT : DOCKED_HEIGHT;
+        return AxisAlignedBB.getBoundingBox(x, y, z, x + 1.0D, y + height, z + 1.0D);
+    }
+
+    @Override
+    public boolean isOpaqueCube() {
+        return false;
+    }
+
+    @Override
+    public boolean renderAsNormalBlock() {
+        return false;
+    }
+
+    // NB: getRenderType() is deliberately NOT overridden. The dock is drawn from
+    // assets/danknull/blockstates/danknull_dock.json through GTNHLib's ModelISBRH, which hooks
+    // RenderBlocks.renderBlockByRenderType - and that method bails out before GTNHLib's injection point when the
+    // render type is -1. The inherited default (0) is what lets the JSON model draw.
+    // TODO(render agent): the docked /dank/null itself still needs a TESR bound to TileDankNullDock (upstream's
+    // TESRDankNullDock), plus the danknull:danknull_dock block texture referenced above.
+
+    @Override
+    public boolean isSideSolid(final IBlockAccess world, final int x, final int y, final int z,
+        final ForgeDirection side) {
+        return true;
+    }
+
+    @Override
+    @SideOnly(Side.CLIENT)
+    public boolean shouldSideBeRendered(final IBlockAccess world, final int x, final int y, final int z,
+        final int side) {
+        return true;
+    }
+
+    @Override
+    public boolean canConnectRedstone(final IBlockAccess world, final int x, final int y, final int z, final int side) {
+        return true;
+    }
+
+    // ------------------------------------------------------------------
+    // placement / interaction
+    // ------------------------------------------------------------------
+
+    @Override
+    public void onBlockPlacedBy(final World world, final int x, final int y, final int z, final EntityLivingBase placer,
+        final ItemStack stack) {
+        // Vanilla yaw index: 0 = looking south, 1 = west, 2 = north, 3 = east. Adding 2 turns the dock around so
+        // its front faces back towards the placer.
+        final int yawIndex = MathHelper.floor_double(placer.rotationYaw * 4.0F / 360.0F + 0.5D) & FACING_MASK;
+        world.setBlockMetadataWithNotify(x, y, z, (yawIndex + 2) & FACING_MASK, 2);
+    }
+
+    @Override
+    public boolean onBlockActivated(final World world, final int x, final int y, final int z, final EntityPlayer player,
+        final int side, final float hitX, final float hitY, final float hitZ) {
+        if (world.isRemote) {
+            return true;
+        }
+        final MinecraftServer server = MinecraftServer.getServer();
+        if (server != null && server.isBlockProtected(world, x, y, z, player)) {
+            return false;
+        }
+        final TileDankNullDock dankDock = getTE(world, x, y, z);
+        if (dankDock == null) {
+            return false;
+        }
+        // 1.7.10 has no off-hand, so upstream's PlayerSlot/EnumHand dance collapses to the single held item.
+        final ItemStack heldStack = player.getHeldItem();
+        if (isEmpty(dankDock.getDankNull())) {
+            if (DankNullUtils.isDankNull(heldStack)) {
+                dankDock.setDankNull(heldStack);
+                player.setCurrentItemOrArmor(0, null);
+                // Upstream fired PacketSetDankNullInDock here; TileDankNullDock.markDirty() now pushes the vanilla
+                // description packet to everyone tracking the chunk instead.
+                return true;
+            }
+            return false;
+        }
+        if (isEmpty(heldStack) && player.isSneaking()) {
+            player.setCurrentItemOrArmor(
+                0,
+                dankDock.getDankNull()
+                    .copy());
+            dankDock.removeDankNull();
+            dankDock.markDirty();
+            return true;
+        }
+        if (!player.isSneaking()) {
+            player.openGui(DankNull.INSTANCE, ModGuiHandler.DANKNULL_DOCK, world, x, y, z);
+            return true;
+        }
+        return false;
+    }
+
+    // ------------------------------------------------------------------
+    // drops - the docked /dank/null has to survive being broken
+    // ------------------------------------------------------------------
+
+    @Override
+    public int damageDropped(final int meta) {
+        return 0;
+    }
+
+    /**
+     * Delay the actual removal until after {@link #harvestBlock} has run, so {@link #getDrops} can still see the
+     * tile entity. 1.12's {@code harvestBlock} was handed the tile entity directly; 1.7.10 only gives us the
+     * metadata, and by default the block (and its tile) is already gone by then.
+     */
+    @Override
+    public boolean removedByPlayer(final World world, final EntityPlayer player, final int x, final int y, final int z,
+        final boolean willHarvest) {
+        if (willHarvest) {
+            return true;
+        }
+        return super.removedByPlayer(world, player, x, y, z, willHarvest);
+    }
+
+    @Override
+    public void harvestBlock(final World world, final EntityPlayer player, final int x, final int y, final int z,
+        final int meta) {
+        super.harvestBlock(world, player, x, y, z, meta);
+        world.setBlockToAir(x, y, z);
+    }
+
+    @Override
+    public ArrayList<ItemStack> getDrops(final World world, final int x, final int y, final int z, final int metadata,
+        final int fortune) {
+        final ArrayList<ItemStack> drops = new ArrayList<ItemStack>();
+        drops.add(getItemBlockWithNBT(world.getTileEntity(x, y, z)));
+        return drops;
+    }
+
+    @Override
+    public ItemStack getPickBlock(final MovingObjectPosition target, final World world, final int x, final int y,
+        final int z) {
+        return getItemBlockWithNBT(world.getTileEntity(x, y, z));
+    }
+
+    private ItemStack getItemBlockWithNBT(final TileEntity te) {
+        final ItemStack stack = new ItemStack(this, 1, 0);
+        if (te != null) {
+            final NBTTagCompound tileTag = new NBTTagCompound();
+            te.writeToNBT(tileTag);
+            stack.setTagInfo(NBT.BLOCKENTITYTAG, tileTag);
+        }
+        return stack;
+    }
+}

@@ -1,0 +1,21 @@
+{
+	"modListVersion": 2,
+	"modList": [{
+		"modid": "${modId}",
+		"name": "${modName}",
+		"description": "Adds the /dank/null - a portable, tiered, filtering item vacuum and dispenser. This is a 1.7.10 backport of p455w0rd's 1.12.2 /dank/null mod, targeting the GTNH environment.",
+		"version": "${modVersion}",
+		"mcversion": "${minecraftVersion}",
+		"url": "https://github.com/p455w0rd/DankNull",
+		"updateUrl": "",
+		"authorList": ["p455w0rd"],
+		"credits": "Original 1.12.2 mod by p455w0rd (TheRealp455w0rd). 1.7.10 backport uses GTNHLib for JSON model loading.",
+		"logoFile": "",
+		"screenshots": [],
+		"parent": "",
+		"requiredMods": [],
+		"dependencies": [],
+		"dependants": [],
+		"useDependencyInformation": false
+	}]
+}
