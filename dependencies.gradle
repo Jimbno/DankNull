@@ -37,7 +37,7 @@ dependencies {
     // GTNHLib: provides the modern 1.12-style JSON model/blockstate pipeline
     // (com.gtnewhorizon.gtnhlib.client.model.*) that this backport renders through,
     // plus the blockstate core used in place of 1.7.10 metadata juggling.
-    api("com.github.GTNewHorizons:GTNHLib:0.11.43:dev")
+    api("com.github.GTNewHorizons:GTNHLib:0.11.24:dev")
 
     // Angelica: compiled against for @ThreadSafeISBRH and the batched TESR mesh API.
     // compileOnly so DankNull still loads on a pack without Angelica.
