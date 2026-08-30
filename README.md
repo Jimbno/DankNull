@@ -29,19 +29,6 @@ present. Each optional mod is detected at runtime and only adds something when i
 - **GregTech** adds the assembler recipes for the HV–UV tiers, registered from `ModGTRecipes` behind a
   `Loader.isModLoaded("gregtech")` guard in `ModRecipes`.
 
-## Building
-
-```sh
-./gradlew build
-```
-
-The mod jar is written to `build/libs/`. Use the **plain** jar (e.g. `danknull-<version>.jar`) for a real
-instance — the `-dev` jar is deobfuscated and only works inside the development workspace, and the
-`-sources` / `-api` jars are not runtime mods.
-
-Versioning comes from git tags. An untagged checkout builds as `NO-GIT-TAG-SET`; tag a commit (for example
-`git tag v0.1.0`) to get a real version stamped into the jar and `mcmod.info`.
-
 ## What differs from the 1.12 original
 
 1.7.10 lacks several systems the original relied on, so the equivalent behaviour is rebuilt here:
