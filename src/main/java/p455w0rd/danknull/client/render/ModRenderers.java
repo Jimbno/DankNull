@@ -24,8 +24,9 @@ import p455w0rd.danknull.init.ModItems;
  * What is <em>not</em> here, and why:
  * </p>
  * <ul>
- * <li><b>The docking station's block.</b> {@code ModelRegistry.registerModid} in the proxy's preInit opts the mod
- * into GTNHLib's JSON model pipeline, which marks the block modeled and draws it through {@code ModelISBRH}.</li>
+ * <li><b>The docking station's block.</b> It draws nothing in the chunk pass
+ * ({@code BlockDankNullDock.getRenderType()} is -1); {@link TESRDankNullDock}, bound below, draws both its body and
+ * the docked /dank/null from OBJ.</li>
  * <li><b>The HUD.</b> {@code ModEvents} owns the {@code RenderGameOverlayEvent.Post} handler and calls
  * {@link HUDRenderer#renderHUD} from there.</li>
  * </ul>
@@ -89,7 +90,6 @@ public class ModRenderers {
     public void onTextureStitchPost(final TextureStitchEvent.Post event) {
         JsonItemModel.flush();
         ObjItemModel.flush();
-        p455w0rd.danknull.blocks.BlockDankNullDock.invalidateModel();
     }
 
     /**

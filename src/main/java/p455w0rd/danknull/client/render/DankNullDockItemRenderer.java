@@ -1,49 +1,35 @@
 package p455w0rd.danknull.client.render;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.client.IItemRenderer;
 
 import org.lwjgl.opengl.GL11;
 
-import com.gtnewhorizon.gtnhlib.client.model.ModelISBRH;
-
 import p455w0rd.danknull.items.ItemBlockDankNullDock;
 import p455w0rd.danknull.util.DankNullStackUtils;
 
 /**
- * The docking station's <em>item</em> form: GTNHLib's JSON model for the dock body, with the docked /dank/null
- * floating above it - the same thing {@link TESRDankNullDock} draws for the placed block, and what upstream's nested
+ * The docking station's <em>item</em> form: the dock body OBJ with the docked /dank/null floating above it - the
+ * same pair {@link TESRDankNullDock} draws for the placed block, and what upstream's nested
  * {@code TESRDankNullDock.DankNullDockItemRenderer} did in 1.12.
  *
  * <p>
- * <b>Why this delegates instead of replacing.</b> GTNHLib owns the dock's ItemBlock renderer: its
- * {@code ModelRegistry.ReloadListener} walks the whole block registry on every resource-manager reload and calls
- * {@code MinecraftForgeClient.registerItemRenderer(Item.getItemFromBlock(block), ModelISBRH.INSTANCE.get())} for
- * every modeled block ({@code ModelRegistry.java}, {@code loadModelInfo}). Registering something else for the dock is
- * therefore only ever temporary - see {@link ModRenderers} for how the registration is kept alive. Rather than
- * reimplement what {@code ModelISBRH} does, this renderer calls straight into it for the dock body and only adds the
- * docked /dank/null on top, so the body keeps rendering exactly as GTNHLib renders it.
- * </p>
- *
- * <p>
- * <b>Why the display transform is repeated here.</b> {@code ModelISBRH.renderItem} applies the model's BlockBench
- * {@code display} transform (its private {@code applyItemDisplay}) <em>inside</em> its own
- * {@code glPushMatrix}/{@code glPopMatrix} pair, so by the time it returns the matrix is back to the raw Forge
- * helper space and the dock body's on-screen placement is not reproducible without redoing that transform.
- * {@code assets/danknull/models/block/danknull_dock.json} carries no {@code display} block at all, so every
- * {@code getDisplay} lookup returns {@code Position.ModelDisplay.DEFAULT} and {@code applyItemDisplay} takes its
- * "no display data" branch in each case - which is the fixed sequence {@link #applyDockDisplay} reproduces. After it,
- * the coordinate space is the model's own 0..1 block space, so the /dank/null can be placed with the same numbers
- * {@link TESRDankNullDock} uses in world space.
+ * <b>Why the display transform is applied by hand.</b> Forge hands an {@code IItemRenderer} a raw helper space that
+ * differs per {@link ItemRenderType}; the block-model path (GTNHLib's {@code ModelISBRH}) normally absorbs that in
+ * its private {@code applyItemDisplay}. Since the dock no longer goes through a JSON model, that fixed sequence is
+ * reproduced in {@link #applyDockDisplay} - the "no display data" branch, as the dock model carries no
+ * {@code display} block. After it, the coordinate space is the model's own 0..1 block space, so the /dank/null can
+ * be placed with the same numbers {@link TESRDankNullDock} uses in world space.
  * </p>
  */
 public class DankNullDockItemRenderer implements IItemRenderer {
 
     /** Centre height of the floating /dank/null in dock-model space; matches {@link TESRDankNullDock}. */
-    private static final float DOCKED_Y = 0.4F;
+    private static final float DOCKED_Y = 0.75F;
 
-    /** Half a block wide, as in {@link TESRDankNullDock}. */
-    private static final float DOCKED_SCALE = 0.5F;
+    /** Matches {@link TESRDankNullDock}'s docked-item scale. */
+    private static final float DOCKED_SCALE = 0.75F;
 
     private final DankNullItemRenderer dankNullRenderer;
 
@@ -51,13 +37,13 @@ public class DankNullDockItemRenderer implements IItemRenderer {
         this.dankNullRenderer = dankNullRenderer;
     }
 
-    /** Matches {@code ModelISBRH}, which we stand in front of. */
+    /** This renderer draws every render type itself. */
     @Override
     public boolean handleRenderType(final ItemStack item, final ItemRenderType type) {
         return true;
     }
 
-    /** Matches {@code ModelISBRH}, so Forge applies exactly the helper transforms it is calibrated for. */
+    /** Asks Forge for the standard helper transforms, which {@link #applyDockDisplay} is calibrated for. */
     @Override
     public boolean shouldUseRenderHelper(final ItemRenderType type, final ItemStack item,
         final ItemRendererHelper helper) {
@@ -66,8 +52,24 @@ public class DankNullDockItemRenderer implements IItemRenderer {
 
     @Override
     public void renderItem(final ItemRenderType type, final ItemStack stack, final Object... data) {
-        ModelISBRH.INSTANCE.get()
-            .renderItem(type, stack, data);
+        GL11.glPushMatrix();
+        GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_COLOR_BUFFER_BIT);
+        try {
+            applyDockDisplay(type);
+            // applyDockDisplay leaves the model's own 0..1 block space, but the OBJ is centred on X/Z, so shift it
+            // to the middle of that space.
+            GL11.glTranslatef(0.5F, 0.0F, 0.5F);
+            Minecraft.getMinecraft()
+                .getTextureManager()
+                .bindTexture(TESRDankNullDock.BODY_TEXTURE);
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+            GL11.glEnable(GL11.GL_ALPHA_TEST);
+            ObjItemModel.get(TESRDankNullDock.BODY_MODEL)
+                .renderAll();
+        } finally {
+            GL11.glPopAttrib();
+            GL11.glPopMatrix();
+        }
 
         final ItemStack docked = ItemBlockDankNullDock.getDockedDankNull(stack);
         if (DankNullStackUtils.isEmpty(docked)) {

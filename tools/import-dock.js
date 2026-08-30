@@ -6,21 +6,22 @@
  *
  * Defaults to the Blockbench project directory. Re-run after every export.
  *
- * Unlike the /dank/null item (see import-obj.sh), the dock is a BLOCK, so it does not go through Forge's OBJ
- * loader. It is emitted as a vanilla-format JSON block model instead, which GTNHLib bakes into the chunk mesh:
- * that keeps lighting, ambient occlusion and culling correct and costs nothing per frame, where an OBJ would have
- * to be drawn from a TESR in immediate mode every tick.
+ * Same job as import-obj.sh does for the /dank/null item, and the same fixes, because Forge 1.7.10's OBJ loader
+ * (net.minecraftforge.client.model.obj.WavefrontObject) is stricter than Blockbench's exporter:
  *
- * That is only possible because every visible dock element is an axis-aligned box. This script verifies that
- * rather than assuming it, and refuses to write a model it cannot represent.
+ *  1. Group names. The parser's pattern only allows [\w\d.]+ and THROWS ModelFormatException on a name containing
+ *     a space.
+ *  2. Number format. Every v/vn/vt component needs a plain decimal. Integers ("2") and scientific notation
+ *     ("2.22e-16") are both rejected - and an invalid vt is SILENTLY DROPPED, which shifts every later UV index
+ *     and garbles the texture with no error at all.
+ *  3. UV scale. Blockbench normalises UVs against the *project* resolution, not the texture, so faces need
+ *     rescaling by (resolution / texture width). For the dock these are currently both 64, i.e. a no-op, but it
+ *     is computed rather than assumed so a texture resize does not silently skew every UV.
+ *  4. Degenerate faces. Zero-area quads only produce z-fighting, so they are dropped.
  *
- * Reading the *baked* OBJ rather than the .bbmodel is deliberate: Blockbench stores element coordinates in a local
- * space that group transforms are applied to on export, so the .bbmodel's raw from/to can sit far outside the
- * block while the exported geometry is correctly placed.
- *
- * The `dankerino` group (a copy of the /dank/null, hidden in the editor) is skipped - the docked item is drawn by
- * TESRDankNullDock from the real stack, so baking a second copy into the block would double-draw it and would not
- * reflect the actual tier.
+ * The `dankerino` group is skipped. It is a copy of the /dank/null used as placement reference in Blockbench, but
+ * the docked item is drawn from the real stack by TESRDankNullDock, so shipping it would double-draw it and would
+ * never reflect the actual tier. Its position IS used - see TESRDankNullDock's placement constants.
  */
 'use strict';
 const fs = require('fs');
@@ -31,110 +32,91 @@ const ROOT = path.resolve(__dirname, '..');
 const ASSETS = path.join(ROOT, 'src/main/resources/assets/danknull');
 
 const OBJ = path.join(SRC, 'DankDock.obj');
+const BB = path.join(SRC, 'DankDock.bbmodel');
 const TEX = path.join(SRC, 'texture.png');
 
-/** The group holding the dock body. Everything else in the export is reference geometry. */
+/** Groups that make up the dock body; everything else in the export is reference geometry. */
 const BODY_GROUP = 'cube';
-/** Texture the emitted model binds; must match BlockDankNullDock.setBlockTextureName for particles. */
-const TEXTURE_REF = 'danknull:blocks/dock/base';
 
-function parseObj(text) {
-    const V = [], VT = [], VN = [], objs = [];
-    let cur = null;
-    for (const line of text.split(/\r?\n/)) {
-        const p = line.trim().split(/\s+/);
-        switch (p[0]) {
-            case 'v': V.push([+p[1], +p[2], +p[3]]); break;
-            case 'vt': VT.push([+p[1], +p[2]]); break;
-            case 'vn': VN.push([+p[1], +p[2], +p[3]]); break;
-            case 'o': cur = { name: line.slice(2).trim(), faces: [] }; objs.push(cur); break;
-            case 'f':
-                if (cur) {
-                    cur.faces.push(p.slice(1).map(s => {
-                        const a = s.split('/');
-                        return { v: +a[0] - 1, t: a[1] ? +a[1] - 1 : -1, n: a[2] ? +a[2] - 1 : -1 };
-                    }));
-                }
-                break;
-        }
-    }
-    return { V, VT, VN, objs };
+const f6 = v => v.toFixed(6);
+const sanitize = s => s.replace(/[^A-Za-z0-9_.]/g, '_');
+
+/** PNG width from the IHDR chunk. */
+function pngWidth(file) {
+    return fs.readFileSync(file).readUInt32BE(16);
 }
-
-/** Vanilla face name for a normal. Boxes only, so the dominant axis is the face. */
-function faceOf(n) {
-    const [x, y, z] = n;
-    const ax = Math.abs(x), ay = Math.abs(y), az = Math.abs(z);
-    if (ay >= ax && ay >= az) return y > 0 ? 'up' : 'down';
-    if (az >= ax) return z > 0 ? 'south' : 'north';
-    return x > 0 ? 'east' : 'west';
-}
-
-/** OBJ space is -0.5..0.5 across X/Z and 0..1 up; vanilla models are 0..16 from the block corner. */
-const toModelX = v => round((v + 0.5) * 16);
-const toModelY = v => round(v * 16);
-const round = v => Math.round(v * 1000) / 1000;
 
 function main() {
-    for (const f of [OBJ, TEX]) {
+    for (const f of [OBJ, BB, TEX]) {
         if (!fs.existsSync(f)) {
             console.error(`missing ${f}`);
             process.exit(1);
         }
     }
-    const { V, VT, VN, objs } = parseObj(fs.readFileSync(OBJ, 'utf8'));
-    const bodies = objs.filter(o => o.name === BODY_GROUP);
-    const skipped = objs.filter(o => o.name !== BODY_GROUP).map(o => o.name);
-    if (!bodies.length) {
-        console.error(`no "${BODY_GROUP}" group in ${OBJ}`);
-        process.exit(1);
+    const res = JSON.parse(fs.readFileSync(BB, 'utf8')).resolution.width;
+    const tex = pngWidth(TEX);
+    const k = res / tex;
+    console.log(`project resolution ${res}, texture ${tex}px -> UV factor ${k}`);
+
+    const V = [], VT = [], out = [];
+    let group = null, kept = 0, dropped = 0, skippedGroups = new Set();
+
+    for (const line of fs.readFileSync(OBJ, 'utf8').split(/\r?\n/)) {
+        const p = line.trim().split(/\s+/);
+        switch (p[0]) {
+            case 'v':
+                V.push([+p[1], +p[2], +p[3]]);
+                break;
+            case 'vt':
+                VT.push([+p[1], +p[2]]);
+                break;
+        }
     }
 
-    const elements = [];
-    for (const [i, o] of bodies.entries()) {
-        const verts = [...new Set(o.faces.flat().map(f => f.v))].map(k => V[k]);
-        if (verts.length !== 8 || o.faces.length !== 6) {
-            console.error(`element ${i} is not a box (${verts.length} verts, ${o.faces.length} faces) - `
-                + `a vanilla JSON model cannot represent it. Keep dock geometry to unrotated boxes.`);
-            process.exit(1);
+    // Second pass emits, so faces can be tested against the vertex table above.
+    let emitting = false;
+    for (const line of fs.readFileSync(OBJ, 'utf8').split(/\r?\n/)) {
+        const p = line.trim().split(/\s+/);
+        if (p[0] === 'o') {
+            group = line.slice(2).trim();
+            emitting = group === BODY_GROUP;
+            if (!emitting) {
+                skippedGroups.add(group);
+                continue;
+            }
+            out.push(`o ${sanitize(group)}`);
+        } else if (p[0] === 'v' || p[0] === 'vn') {
+            // Vertex tables are global and shared by index, so they must all be emitted regardless of group.
+            out.push(`${p[0]} ${f6(+p[1])} ${f6(+p[2])} ${f6(+p[3])}`);
+        } else if (p[0] === 'vt') {
+            // Blockbench normalises V with the origin at the bottom; rescale about that same origin.
+            out.push(`vt ${f6(+p[1] * k)} ${f6(1 - (1 - +p[2]) * k)}`);
+        } else if (p[0] === 'f') {
+            if (!emitting) continue;
+            const verts = p.slice(1).map(s => V[+s.split('/')[0] - 1]);
+            const uniq = new Set(verts.map(v => v.join(',')));
+            if (uniq.size < 3) {
+                dropped++;
+                continue;
+            }
+            kept++;
+            out.push(line.trim());
+        } else if (p[0] === 'mtllib' || p[0] === 'usemtl') {
+            // Dropped: the TESR binds the texture itself, so no material library is needed or wanted.
+            continue;
         }
-        const min = [0, 1, 2].map(a => Math.min(...verts.map(v => v[a])));
-        const max = [0, 1, 2].map(a => Math.max(...verts.map(v => v[a])));
-
-        const faces = {};
-        for (const f of o.faces) {
-            const dir = faceOf(VN[f[0].n]);
-            const us = f.map(x => VT[x.t][0]);
-            const vs = f.map(x => VT[x.t][1]);
-            // OBJ puts V=0 at the bottom of the texture, vanilla models put it at the top.
-            faces[dir] = {
-                texture: '#0',
-                uv: [round(Math.min(...us) * 16), round((1 - Math.max(...vs)) * 16),
-                    round(Math.max(...us) * 16), round((1 - Math.min(...vs)) * 16)],
-            };
-        }
-        elements.push({
-            name: `dock_${i}`,
-            from: [toModelX(min[0]), toModelY(min[1]), toModelX(min[2])],
-            to: [toModelX(max[0]), toModelY(max[1]), toModelX(max[2])],
-            faces,
-        });
     }
 
-    const model = {
-        __comment: 'GENERATED by tools/import-dock.js from the Blockbench DankDock export - do not hand-edit.',
-        textures: { particle: TEXTURE_REF, 0: TEXTURE_REF },
-        elements,
-    };
-    const out = path.join(ASSETS, 'models/block/danknull_dock.json');
-    fs.writeFileSync(out, JSON.stringify(model, null, 2) + '\n');
-    fs.copyFileSync(TEX, path.join(ASSETS, 'textures/blocks/dock/base.png'));
+    const dest = path.join(ASSETS, 'models/danknull_dock.obj');
+    fs.writeFileSync(dest, out.join('\n') + '\n');
+    fs.copyFileSync(TEX, path.join(ASSETS, 'textures/models/danknull_dock.png'));
 
-    const hi = elements.reduce((m, e) => Math.max(m, e.to[1]), 0);
-    console.log(`wrote ${elements.length} boxes -> ${path.relative(ROOT, out)}`);
-    if (skipped.length) console.log(`skipped reference groups: ${[...new Set(skipped)].join(', ')}`);
-    for (const e of elements) console.log(`  ${e.name}: ${JSON.stringify(e.from)} -> ${JSON.stringify(e.to)}`);
-    console.log(`model height is ${hi}/16 - BlockDankNullDock's bounding boxes must match this.`);
+    console.log(`wrote ${kept} faces -> ${path.relative(ROOT, dest)} (dropped ${dropped} zero-area)`);
+    if (skippedGroups.size) console.log(`skipped reference groups: ${[...skippedGroups].join(', ')}`);
+
+    const us = VT.map(t => t[0] * k), vs = VT.map(t => 1 - (1 - t[1]) * k);
+    console.log(`UV range U ${Math.min(...us).toFixed(3)}..${Math.max(...us).toFixed(3)}  `
+        + `V ${Math.min(...vs).toFixed(3)}..${Math.max(...vs).toFixed(3)}`);
 }
 
 main();

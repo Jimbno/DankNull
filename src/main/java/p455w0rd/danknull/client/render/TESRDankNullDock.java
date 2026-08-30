@@ -4,19 +4,23 @@ import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.tileentity.TileEntitySpecialRenderer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.ResourceLocation;
 
 import org.lwjgl.opengl.GL11;
 
 import p455w0rd.danknull.blocks.tiles.TileDankNullDock;
+import p455w0rd.danknull.init.ModGlobals;
 import p455w0rd.danknull.util.DankNullStackUtils;
 
 /**
- * Draws the docked /dank/null floating above the docking station.
+ * Draws the docking station: its body from {@code models/danknull_dock.obj}, and the docked /dank/null above it.
  *
  * <p>
- * The dock body itself is not drawn here - the block carries a GTNHLib JSON model and GTNHLib renders both the
- * model and the TESR for a modeled block, so this renderer is only responsible for the item on top. That mirrors
- * 1.12, where the TESR did nothing but delegate to the generic item renderer.
+ * The body is drawn here rather than in the chunk mesh because Forge's OBJ loader renders through
+ * {@code Tessellator.startDrawing()/draw()} - immediate mode - which cannot run inside {@code renderWorldBlock}
+ * while a chunk-wide tessellation is open. {@code BlockDankNullDock.getRenderType()} returns -1 accordingly, so
+ * nothing is drawn for the block in the chunk pass. Drawing the model here also lets it bind its own texture, so
+ * its UVs are not confined to a stitched terrain atlas sprite.
  * </p>
  *
  * <p>
@@ -37,7 +41,54 @@ public class TESRDankNullDock extends TileEntitySpecialRenderer {
     private static final double DOCKED_ITEM_SCALE = 0.75D;
     private static final double DOCKED_ITEM_CENTRE_Y = 0.75D;
 
+    /** Dock body model and its texture, produced by {@code tools/import-dock.js}. */
+    static final String BODY_MODEL = "models/danknull_dock.obj";
+    static final ResourceLocation BODY_TEXTURE = new ResourceLocation(
+        ModGlobals.MODID,
+        "textures/models/danknull_dock.png");
+
     private final DankNullItemRenderer itemRenderer = new DankNullItemRenderer();
+
+    /**
+     * Draws the dock body. The OBJ is modelled in block space with the origin at the centre of the block's
+     * footprint and y running up from its base, so it needs no transform beyond being placed at the block corner.
+     */
+    private void renderBody(final TileDankNullDock dock, final double x, final double y, final double z) {
+        GL11.glPushMatrix();
+        GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_COLOR_BUFFER_BIT);
+        try {
+            GL11.glTranslated(x + 0.5D, y, z + 0.5D);
+            // Metadata holds which way the front faces; the model is authored facing south (its opening on +X).
+            GL11.glRotatef(facingAngle(dock), 0.0F, 1.0F, 0.0F);
+            bindTexture(BODY_TEXTURE);
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+            GL11.glEnable(GL11.GL_ALPHA_TEST);
+            GL11.glDisable(GL11.GL_BLEND);
+            ObjItemModel.get(BODY_MODEL)
+                .renderAll();
+        } finally {
+            GL11.glPopAttrib();
+            GL11.glPopMatrix();
+        }
+    }
+
+    /** Degrees to rotate the body so its front matches the facing stored in block metadata. */
+    private static float facingAngle(final TileDankNullDock dock) {
+        if (dock.getWorldObj() == null) {
+            return 0.0F;
+        }
+        switch (dock.getWorldObj()
+            .getBlockMetadata(dock.xCoord, dock.yCoord, dock.zCoord) & 3) {
+            case 1:
+                return 90.0F;
+            case 2:
+                return 180.0F;
+            case 3:
+                return 270.0F;
+            default:
+                return 0.0F;
+        }
+    }
 
     @Override
     public void renderTileEntityAt(final TileEntity tile, final double x, final double y, final double z,
@@ -45,13 +96,26 @@ public class TESRDankNullDock extends TileEntitySpecialRenderer {
         if (!(tile instanceof TileDankNullDock)) {
             return;
         }
-        final ItemStack stack = ((TileDankNullDock) tile).getDankNull();
-        if (DankNullStackUtils.isEmpty(stack)) {
-            return;
-        }
+        final TileDankNullDock dock = (TileDankNullDock) tile;
 
         final float previousBrightnessX = OpenGlHelper.lastBrightnessX;
         final float previousBrightnessY = OpenGlHelper.lastBrightnessY;
+
+        // The body draws whether or not anything is docked - it is the block itself, which renders nothing in the
+        // chunk pass.
+        if (dock.getWorldObj() != null) {
+            final int bodyBrightness = dock.getWorldObj()
+                .getLightBrightnessForSkyBlocks(dock.xCoord, dock.yCoord, dock.zCoord, 0);
+            OpenGlHelper
+                .setLightmapTextureCoords(OpenGlHelper.lightmapTexUnit, bodyBrightness % 65536, bodyBrightness / 65536);
+        }
+        renderBody(dock, x, y, z);
+        OpenGlHelper.setLightmapTextureCoords(OpenGlHelper.lightmapTexUnit, previousBrightnessX, previousBrightnessY);
+
+        final ItemStack stack = dock.getDankNull();
+        if (DankNullStackUtils.isEmpty(stack)) {
+            return;
+        }
 
         GL11.glPushMatrix();
         try {
