@@ -52,6 +52,9 @@ public class TileDankNullDock extends TileEntity implements ISidedInventory {
     /** Suppresses the block update storm while the handler is being deserialised. */
     private boolean loading = false;
 
+    /** Guards against a wrapped World re-entering {@link #markDirty()} from inside markBlockForUpdate. */
+    private boolean updating = false;
+
     /** Cached {@link #getAccessibleSlotsFromSide(int)} result; invalidated whenever the docked stack changes. */
     private int[] accessibleSlots = new int[0];
 
@@ -103,11 +106,14 @@ public class TileDankNullDock extends TileEntity implements ISidedInventory {
                 TileDankNullDock.this.markDirty();
             }
         };
+        // Save and restore rather than clearing outright: readFromNBT sets this for the whole read, and
+        // clearing it here would re-enable broadcasting midway through a chunk load.
+        final boolean wasLoading = loading;
         loading = true;
         try {
             handler.load();
         } finally {
-            loading = false;
+            loading = wasLoading;
         }
         dankNullHandler = handler;
         rebuildAccessibleSlots();
@@ -145,12 +151,25 @@ public class TileDankNullDock extends TileEntity implements ISidedInventory {
     @Override
     public void markDirty() {
         super.markDirty();
-        if (loading || worldObj == null) {
+        if (loading || worldObj == null || updating) {
             return;
         }
-        // Server side this queues the description packet below for everyone tracking the chunk, which is what
-        // upstream's PacketSetDankNullInDock / PacketEmptyDock did by hand; client side it just re-renders.
-        worldObj.markBlockForUpdate(xCoord, yCoord, zCoord);
+        // Only push an update once this tile is actually registered at its position. During placement and chunk
+        // load the world is still mid-registration, and re-entering it here is what caused the recursion below.
+        if (worldObj.getTileEntity(xCoord, yCoord, zCoord) != this) {
+            return;
+        }
+        // Re-entrancy guard: markBlockForUpdate is not a leaf call. Other mods wrap World and do real work in it
+        // (LogisticsPipes' LPWorldAccess calls getTileEntity straight back), so without this a wrapper that
+        // reaches back into tile-entity registration turns one update into unbounded recursion.
+        updating = true;
+        try {
+            // Server side this queues the description packet below for everyone tracking the chunk, which is what
+            // upstream's PacketSetDankNullInDock / PacketEmptyDock did by hand; client side it just re-renders.
+            worldObj.markBlockForUpdate(xCoord, yCoord, zCoord);
+        } finally {
+            updating = false;
+        }
     }
 
     @Override
@@ -168,13 +187,14 @@ public class TileDankNullDock extends TileEntity implements ISidedInventory {
         }
     }
 
-    @Override
-    public void validate() {
-        super.validate();
-        if (worldObj != null && !worldObj.isRemote) {
-            worldObj.markBlockForUpdate(xCoord, yCoord, zCoord);
-        }
-    }
+    // NB: validate() is deliberately NOT overridden to push a block update.
+    //
+    // It used to call worldObj.markBlockForUpdate here, which crashed with a StackOverflowError on any pack
+    // wrapping World: validate() runs from inside Chunk.func_150812_a while the world is still registering this
+    // tile, so the update re-entered that registration. With LogisticsPipes installed the cycle was
+    // validate -> markBlockForUpdate -> LPWorldAccess -> getTileEntity -> setTileEntity -> validate -> ...
+    // The push was redundant anyway: vanilla sends getDescriptionPacket() to each player as the chunk is sent,
+    // and every content change already routes through markDirty() above.
 
     // ------------------------------------------------------------------
     // NBT
@@ -183,11 +203,20 @@ public class TileDankNullDock extends TileEntity implements ISidedInventory {
     @Override
     public void readFromNBT(final NBTTagCompound nbt) {
         super.readFromNBT(nbt);
-        if (nbt.hasKey(NBT.DOCKEDSTACK, Constants.NBT.TAG_COMPOUND)) {
-            setDankNull(ItemStack.loadItemStackFromNBT(nbt.getCompoundTag(NBT.DOCKEDSTACK)));
-        } else {
-            // Needed on the client: an emptied dock arrives as a description packet with no docked stack.
-            removeDankNull();
+        // Reading is never itself a reason to broadcast: on chunk load the world has not finished registering
+        // this tile, and on the client this IS the incoming update. Callers that read NBT into a live tile
+        // (ItemBlockDankNullDock.placeBlockAt) mark it dirty themselves afterwards.
+        final boolean wasLoading = loading;
+        loading = true;
+        try {
+            if (nbt.hasKey(NBT.DOCKEDSTACK, Constants.NBT.TAG_COMPOUND)) {
+                setDankNull(ItemStack.loadItemStackFromNBT(nbt.getCompoundTag(NBT.DOCKEDSTACK)));
+            } else {
+                // Needed on the client: an emptied dock arrives as a description packet with no docked stack.
+                removeDankNull();
+            }
+        } finally {
+            loading = wasLoading;
         }
     }
 
