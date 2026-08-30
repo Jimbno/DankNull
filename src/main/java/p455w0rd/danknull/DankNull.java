@@ -15,7 +15,7 @@ import p455w0rd.danknull.proxy.CommonProxy;
     modid = ModGlobals.MODID,
     name = ModGlobals.NAME,
     version = Tags.VERSION,
-    dependencies = "required-after:gtnhlib@[0.11.24,);after:angelica",
+    dependencies = "required-after:gtnhlib@[0.11.24,);after:angelica;after:gregtech",
     acceptedMinecraftVersions = "[1.7.10]",
     guiFactory = "p455w0rd.danknull.init.ModGuiFactory")
 public class DankNull {

@@ -11,6 +11,7 @@ import net.minecraft.item.crafting.IRecipe;
 import net.minecraftforge.oredict.RecipeSorter;
 import net.minecraftforge.oredict.ShapedOreRecipe;
 
+import cpw.mods.fml.common.Loader;
 import cpw.mods.fml.common.registry.GameRegistry;
 import p455w0rd.danknull.DankNull;
 import p455w0rd.danknull.recipes.RecipeDankNullUpgrade;
@@ -49,6 +50,9 @@ public class ModRecipes {
 
     public static final IRecipe[] UPGRADE_RECIPES = new IRecipe[5];
 
+    /** GregTech's mod id on 1.7.10. Its presence decides which progression the recipes follow. */
+    private static final String GREGTECH = "gregtech";
+
     public static void register() {
         // 1.7.10 Forge sorts custom IRecipe implementations by registered category; without this it logs
         // "Unknown recipe class!" and falls back to an arbitrary ordering. It must be tried before the vanilla
@@ -60,10 +64,35 @@ public class ModRecipes {
             RecipeSorter.Category.SHAPED,
             "before:minecraft:shaped");
 
+        // The tier upgrade stays on the crafting bench on BOTH paths, and has to: it is the only recipe that
+        // carries a /dank/null's stored contents across to the new tier, which RecipeDankNullUpgrade does by
+        // copying the stack's NBT. A GregTech recipe cannot - its output is a fixed ItemStack - so upgrading in
+        // an Assembler would hand back an empty /dank/null and silently void everything inside. It stays gated
+        // regardless, because it consumes the next tier's panels and those are GregTech-gated below.
+        registerUpgradeRecipes();
+
+        if (Loader.isModLoaded(GREGTECH)) {
+            // On a GregTech pack the /dank/null is gated on GT progression instead, from HV upwards. The bench
+            // recipes are deliberately NOT registered as well: they are reachable from coal blocks and gems, so
+            // leaving them in would let a player walk straight past the tier gating.
+            DankNull.LOGGER.info("GregTech detected - registering tiered GregTech recipes");
+            ModGTRecipes.register();
+            return;
+        }
+        DankNull.LOGGER.info("No GregTech - registering standalone crafting recipes");
+        registerCraftingBenchRecipes();
+    }
+
+    /** The standalone progression, used on any pack without GregTech: panels from gems and coal blocks. */
+    private static void registerCraftingBenchRecipes() {
         registerPanelRecipes();
         registerDankNullRecipes();
         registerDockRecipe();
-        registerUpgradeRecipes();
+    }
+
+    /** The tier's stained glass pane, shared with {@link ModGTRecipes} so both paths keep the same colours. */
+    static ItemStack getPanelGlassPane(final int tier) {
+        return new ItemStack(Blocks.stained_glass_pane, 1, PANEL_GLASS_META[tier]);
     }
 
     private static void registerPanelRecipes() {
