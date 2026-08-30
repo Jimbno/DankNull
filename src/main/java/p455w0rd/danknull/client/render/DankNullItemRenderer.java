@@ -117,15 +117,19 @@ public class DankNullItemRenderer implements IItemRenderer {
         "textures/misc/enchanted_item_glint.png");
 
     /**
-     * How many times the glint sheet repeats across the model.
+     * How densely the glint sheet is tiled across the model. This is the knob to turn if the banding looks wrong:
+     * lower is broader, higher is finer.
      *
      * <p>
-     * The coordinates it scales are now object-space positions (see {@link #enableGlintCoordGen}), so this is read
-     * directly in model units: the /dank/null is 0.75 units across, so 8 puts roughly six repeats over it. That is
-     * upstream {@code GlintEffectRenderer}'s value, which scaled its texture matrix by the same 8.
+     * It scales object-space positions (see {@link #enableGlintCoordGen}), so it reads directly in model units:
+     * the model is 0.75 across, and the sheet repeats {@code 0.75 * this} times over it. Upstream's
+     * {@code GlintEffectRenderer} used 8, but it was scaling texture-atlas UVs - a range hundreds of times
+     * smaller - so the same number here tiled the sheet about six times over and collapsed the sweep into dense
+     * streaks. Just under one repeat leaves the sheet's own diagonals reading as a few broad bands, which is what
+     * vanilla's stretched glint quad looks like.
      * </p>
      */
-    private static final float GLINT_TEXTURE_SCALE = 8.0F;
+    private static final float GLINT_TEXTURE_SCALE = 1.0F;
 
     /**
      * {@code GL_OBJECT_PLANE} coefficients, deliberately skewed across all three axes.
