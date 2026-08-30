@@ -9,7 +9,7 @@
 		"url": "https://github.com/p455w0rd/DankNull",
 		"updateUrl": "",
 		"authorList": ["p455w0rd", "Jimbno"],
-		"credits": "Original 1.12.2 mod by p455w0rd (TheRealp455w0rd). 1.7.10 backport by Jimbno, who also authored all models and textures in this build - none of the original mod's art is reused. Uses GTNHLib for JSON model loading.",
+		"credits": "Original 1.12.2 mod by p455w0rd (TheRealp455w0rd). 1.7.10 backport by Jimbno, who also authored all models and textures in this build - none of the original mod's art is reused. Runs standalone on 1.7.10 Forge; GTNHLib, Angelica and GregTech are all optional.",
 		"logoFile": "",
 		"screenshots": [],
 		"parent": "",

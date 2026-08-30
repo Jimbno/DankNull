@@ -11,7 +11,6 @@ import net.minecraftforge.client.model.obj.TextureCoordinate;
 import net.minecraftforge.client.model.obj.Vertex;
 import net.minecraftforge.client.model.obj.WavefrontObject;
 
-import com.gtnewhorizon.gtnhlib.client.renderer.TessellatorManager;
 import com.gtnewhorizons.angelica.api.ThreadSafeISBRH;
 
 import cpw.mods.fml.client.registry.ISimpleBlockRenderingHandler;
@@ -41,7 +40,8 @@ import p455w0rd.danknull.blocks.BlockDankNullDock;
  * carries {@link ThreadSafeISBRH} (see {@code AngelicaBlockSafetyRegistry}); without it the dock would silently
  * force its chunks back onto the main thread. This class holds no mutable state, hence {@code perThread = false},
  * and per that annotation's contract the Tessellator is fetched inside the render method - via
- * {@link TessellatorManager#get()}, which returns the calling thread's instance - and never cached in a field.
+ * {@link TessellatorAccess#get()} - and never cached in a field. Angelica is not required: the annotation is
+ * ignored by the JVM when absent, and TessellatorAccess falls back to the vanilla singleton.
  * </p>
  */
 @ThreadSafeISBRH(perThread = false)
@@ -90,7 +90,7 @@ public class DankNullDockRenderer implements ISimpleBlockRenderingHandler {
             return false;
         }
         // Fetched here rather than cached: off-thread chunk builds each have their own instance.
-        final Tessellator tessellator = TessellatorManager.get();
+        final Tessellator tessellator = TessellatorAccess.get();
         // Per-block light level; emit() applies the per-face directional shading on top of it.
         tessellator.setBrightness(block.getMixedBrightnessForBlock(world, x, y, z));
         // The model is centred on the block's footprint, so it is emitted about the centre of x/z.

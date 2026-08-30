@@ -19,8 +19,6 @@ import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
 
-import com.gtnewhorizon.gtnhlib.client.renderer.TessellatorManager;
-
 import p455w0rd.danknull.api.IDankNullHandler;
 import p455w0rd.danknull.init.ModConfig.Options;
 import p455w0rd.danknull.init.ModGlobals;
@@ -390,7 +388,7 @@ public class DankNullItemRenderer implements IItemRenderer {
                             : TextureMap.locationItemsTexture);
                     GL11.glTranslatef(-0.5F, -0.5F, ICON_THICKNESS * 0.5F);
                     ItemRenderer.renderItemIn2D(
-                        TessellatorManager.get(),
+                        TessellatorAccess.get(),
                         icon.getMaxU(),
                         icon.getMinV(),
                         icon.getMinU(),

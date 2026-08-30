@@ -12,8 +12,22 @@ out of your hand.
 | | |
 |---|---|
 | Minecraft | 1.7.10 |
-| GTNHLib | **≥ 0.11.43** (hard dependency) |
-| Angelica | optional (soft dependency) |
+| Forge | 10.13.4.1614 |
+| GTNHLib | optional |
+| Angelica | optional |
+| GregTech | optional |
+
+There are **no hard dependencies**. The mod runs on a plain 1.7.10 Forge install with nothing else
+present. Each optional mod is detected at runtime and only adds something when it happens to be there:
+
+- **GTNHLib** supplies a per-thread Tessellator. `client/render/TessellatorAccess` links it only once
+  `Class.forName` has shown it is installed, and falls back to vanilla's `Tessellator.instance`
+  otherwise, so the reference is never resolved on a standalone install.
+- **Angelica** is what actually builds chunk meshes off the main thread. `DankNullDockRenderer` carries
+  `@ThreadSafeISBRH` to opt into that, which is why the per-thread Tessellator matters; the JVM ignores
+  the annotation when Angelica is absent, and chunk building simply stays on the main thread.
+- **GregTech** adds the assembler recipes for the HV–UV tiers, registered from `ModGTRecipes` behind a
+  `Loader.isModLoaded("gregtech")` guard in `ModRecipes`.
 
 ## Building
 
