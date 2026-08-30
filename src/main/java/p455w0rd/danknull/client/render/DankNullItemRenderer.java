@@ -122,14 +122,14 @@ public class DankNullItemRenderer implements IItemRenderer {
      *
      * <p>
      * It scales object-space positions (see {@link #enableGlintCoordGen}), so it reads directly in model units:
-     * the model is 0.75 across, and the sheet repeats {@code 0.75 * this} times over it. Upstream's
+     * the model is 0.75 across, and the sheet repeats {@code 0.75 * this} times over it. At 0.2 that is well under
+     * one repeat, so a single stretched band sweeps the model rather than the sheet tiling across it. Upstream's
      * {@code GlintEffectRenderer} used 8, but it was scaling texture-atlas UVs - a range hundreds of times
-     * smaller - so the same number here tiled the sheet about six times over and collapsed the sweep into dense
-     * streaks. Just under one repeat leaves the sheet's own diagonals reading as a few broad bands, which is what
-     * vanilla's stretched glint quad looks like.
+     * smaller - so carrying that number over tiled the sheet about six times and collapsed the sweep into dense
+     * streaks.
      * </p>
      */
-    private static final float GLINT_TEXTURE_SCALE = 1.0F;
+    private static final float GLINT_TEXTURE_SCALE = 0.2F;
 
     /**
      * {@code GL_OBJECT_PLANE} coefficients, deliberately skewed across all three axes.
