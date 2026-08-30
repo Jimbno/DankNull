@@ -19,6 +19,9 @@
  *     is computed rather than assumed so a texture resize does not silently skew every UV.
  *  4. Degenerate faces. Zero-area quads only produce z-fighting, so they are dropped.
  *
+ * The texture is installed as a block sprite (textures/blocks/dock/base.png) because the body is drawn into the
+ * chunk mesh from the terrain atlas, not with its own bound texture.
+ *
  * The `dankerino` group is skipped. It is a copy of the /dank/null used as placement reference in Blockbench, but
  * the docked item is drawn from the real stack by TESRDankNullDock, so shipping it would double-draw it and would
  * never reflect the actual tier. Its position IS used - see TESRDankNullDock's placement constants.
@@ -109,7 +112,9 @@ function main() {
 
     const dest = path.join(ASSETS, 'models/danknull_dock.obj');
     fs.writeFileSync(dest, out.join('\n') + '\n');
-    fs.copyFileSync(TEX, path.join(ASSETS, 'textures/models/danknull_dock.png'));
+    // Block-atlas path: the body is drawn into the chunk mesh, so the texture has to be a stitched block sprite.
+    // Must stay in step with BlockDankNullDock.setBlockTextureName, which also drives break particles.
+    fs.copyFileSync(TEX, path.join(ASSETS, 'textures/blocks/dock/base.png'));
 
     console.log(`wrote ${kept} faces -> ${path.relative(ROOT, dest)} (dropped ${dropped} zero-area)`);
     if (skippedGroups.size) console.log(`skipped reference groups: ${[...skippedGroups].join(', ')}`);

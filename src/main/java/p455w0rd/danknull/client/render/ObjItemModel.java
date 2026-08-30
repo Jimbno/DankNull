@@ -6,6 +6,7 @@ import java.util.Map;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.client.model.AdvancedModelLoader;
 import net.minecraftforge.client.model.IModelCustom;
+import net.minecraftforge.client.model.obj.WavefrontObject;
 
 import p455w0rd.danknull.DankNull;
 
@@ -86,6 +87,16 @@ final class ObjItemModel {
         if (loaded != null) {
             loaded.renderOnly(groupNames);
         }
+    }
+
+    /**
+     * The parsed model, or {@code null} if it could not be loaded. Exposed so the dock can walk the geometry and
+     * emit it into a chunk tessellator itself; {@link #renderAll()} cannot be used there because it drives the
+     * Tessellator start/draw cycle, which is already open during chunk building.
+     */
+    WavefrontObject getWavefront() {
+        final IModelCustom loaded = get();
+        return loaded instanceof WavefrontObject ? (WavefrontObject) loaded : null;
     }
 
     void renderAll() {

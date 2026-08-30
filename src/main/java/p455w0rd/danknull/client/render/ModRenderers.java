@@ -8,11 +8,13 @@ import net.minecraftforge.client.event.TextureStitchEvent;
 import net.minecraftforge.common.MinecraftForge;
 
 import cpw.mods.fml.client.registry.ClientRegistry;
+import cpw.mods.fml.client.registry.RenderingRegistry;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
 import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
+import p455w0rd.danknull.blocks.BlockDankNullDock;
 import p455w0rd.danknull.blocks.tiles.TileDankNullDock;
 import p455w0rd.danknull.init.ModBlocks;
 import p455w0rd.danknull.init.ModItems;
@@ -24,9 +26,8 @@ import p455w0rd.danknull.init.ModItems;
  * What is <em>not</em> here, and why:
  * </p>
  * <ul>
- * <li><b>The docking station's block.</b> It draws nothing in the chunk pass
- * ({@code BlockDankNullDock.getRenderType()} is -1); {@link TESRDankNullDock}, bound below, draws both its body and
- * the docked /dank/null from OBJ.</li>
+ * <li><b>The docking station's block.</b> Its body is drawn into the chunk mesh by {@link DankNullDockRenderer},
+ * registered below; {@link TESRDankNullDock} adds only the docked /dank/null.</li>
  * <li><b>The HUD.</b> {@code ModEvents} owns the {@code RenderGameOverlayEvent.Post} handler and calls
  * {@link HUDRenderer#renderHUD} from there.</li>
  * </ul>
@@ -64,6 +65,11 @@ public class ModRenderers {
                 MinecraftForgeClient.registerItemRenderer(panel, panelRenderer);
             }
         }
+
+        // The dock body renders into the chunk mesh; see DankNullDockRenderer for why it is not a TESR.
+        final int dockRenderId = RenderingRegistry.getNextAvailableRenderId();
+        RenderingRegistry.registerBlockHandler(new DankNullDockRenderer(dockRenderId));
+        BlockDankNullDock.renderId = dockRenderId;
 
         dockItem = Item.getItemFromBlock(ModBlocks.DANKNULL_DOCK);
         if (dockItem != null) {

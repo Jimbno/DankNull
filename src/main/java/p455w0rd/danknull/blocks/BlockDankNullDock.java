@@ -149,20 +149,19 @@ public class BlockDankNullDock extends BlockContainer {
     }
 
     /**
-     * -1 means "draw nothing in the chunk pass". The whole dock - body and docked /dank/null alike - is drawn by
+     * Set from {@code ModRenderers} on the client once the dock's ISBRH has been given an id; stays -1 on a
+     * dedicated server, which never renders.
+     */
+    public static int renderId = -1;
+
+    /**
+     * The body is drawn into the chunk mesh by {@code DankNullDockRenderer} - it is a static shape, so it is built
+     * once per block update rather than every frame. Only the docked /dank/null, which is per-tile, is left to
      * {@link p455w0rd.danknull.client.render.TESRDankNullDock}.
-     *
-     * <p>
-     * The body has to come from the TESR rather than the chunk mesh because Forge's OBJ loader renders through
-     * {@code Tessellator.startDrawing()/draw()}, i.e. immediate mode. Inside {@code renderWorldBlock} a chunk-wide
-     * tessellation is already in progress, so that call cannot run there; a TESR is drawn between chunk batches
-     * and can. It also lets the model bind its own texture, so its UVs are not confined to a stitched terrain
-     * atlas sprite.
-     * </p>
      */
     @Override
     public int getRenderType() {
-        return -1;
+        return renderId;
     }
 
     @Override
