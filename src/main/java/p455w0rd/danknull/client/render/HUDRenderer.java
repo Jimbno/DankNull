@@ -7,7 +7,6 @@ import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.entity.RenderItem;
 import net.minecraft.client.renderer.texture.TextureManager;
-import net.minecraft.client.settings.GameSettings;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.StatCollector;
@@ -22,7 +21,6 @@ import p455w0rd.danknull.init.ModConfig;
 import p455w0rd.danknull.init.ModConfig.Options;
 import p455w0rd.danknull.init.ModGlobals;
 import p455w0rd.danknull.init.ModGlobals.DankNullTier;
-import p455w0rd.danknull.init.ModKeyBindings;
 import p455w0rd.danknull.inventory.DankNullHandler;
 import p455w0rd.danknull.items.ItemDankNull;
 import p455w0rd.danknull.util.DankNullStackUtils;
@@ -159,15 +157,9 @@ public class HUDRenderer {
             bottom - 40,
             0xFFFFFF);
 
-        final String keyBind = getOpenKeyName();
-        mc.fontRenderer.drawStringWithShadow(
-            keyBind == null || keyBind.equalsIgnoreCase("none")
-                ? StatCollector.translateToLocal("dn.no_open_keybind.desc")
-                : StatCollector.translateToLocal("dn.open_with.desc") + " " + keyBind,
-            left + 45,
-            bottom - 29,
-            0xFFFFFF);
-
+        // The open keybind used to be reported on its own line here. It told a player who had already opened the
+        // /dank/null how to open it, and spent a line of a six-line card nagging about an unbound key. The ore
+        // dictionary line moves up into the space rather than leaving a hole.
         String oreDictMode = StatCollector.translateToLocal("dn.ore_dictionary.desc") + ": "
             + (handler.isOre(selectedStack) ? StatCollector.translateToLocal("dn.enabled.desc")
                 : StatCollector.translateToLocal("dn.disabled.desc"));
@@ -175,17 +167,7 @@ public class HUDRenderer {
             .isEmpty()) {
             oreDictMode = StatCollector.translateToLocal("dn.not_oredicted.desc");
         }
-        mc.fontRenderer.drawStringWithShadow(oreDictMode, left + 45, bottom - 18, 0xFFFFFF);
-    }
-
-    /**
-     * 1.7.10's {@code KeyBinding} has no {@code getDisplayName()}; the display string is derived from the key code
-     * by {@link GameSettings}.
-     */
-    private static String getOpenKeyName() {
-        return GameSettings.getKeyDisplayString(
-            ModKeyBindings.getOpenDankNullKeyBind()
-                .getKeyCode());
+        mc.fontRenderer.drawStringWithShadow(oreDictMode, left + 45, bottom - 29, 0xFFFFFF);
     }
 
     public static void toggleHUD() {
