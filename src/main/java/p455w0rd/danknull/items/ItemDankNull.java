@@ -147,9 +147,19 @@ public class ItemDankNull extends Item {
             (int) player.posZ);
     }
 
+    /**
+     * Sneak plus right-click opens the GUI, in the air as readily as on the ground.
+     *
+     * <p>
+     * Upstream additionally required a non-air block beneath the player, but only so that being airborne fell
+     * through to the {@code else if} branch below it, which placed an Extra Utilities 2 Angel Block. That
+     * integration is not part of this backport, so the condition guarded a branch that no longer exists and its
+     * only remaining effect was to make the /dank/null impossible to open while flying.
+     * </p>
+     */
     @Override
     public ItemStack onItemRightClick(final ItemStack stack, final World world, final EntityPlayer player) {
-        if (player.isSneaking() && getBlockUnderPlayer(player) != Blocks.air && !world.isRemote) {
+        if (player.isSneaking() && !world.isRemote) {
             openGui(player, world);
         }
         return stack;
@@ -182,8 +192,12 @@ public class ItemDankNull extends Item {
         // so getBlockUnderPlayer would be evaluated for a different interaction than the one the player made, and
         // sneak+right-click on a block with an empty /dank/null did nothing at all. The selected-block check is
         // therefore used only to choose between "place the block" and "open the GUI", not whether the GUI can open.
-        if (player.isSneaking() && blockUnderPlayer != Blocks.air
-            && (!isSelectedStackABlock || blockUnderPlayer != selectedBlock)) {
+        //
+        // Nor is a solid block beneath the player required, for the same reason as in onItemRightClick: that test
+        // existed upstream only to let an airborne player fall through to the Angel Block branch. What remains is
+        // the bridging exception - standing on the very block you have selected means you are laying a path, so
+        // the click places rather than opening the GUI. Airborne, there is no such block, so the GUI opens.
+        if (player.isSneaking() && (!isSelectedStackABlock || blockUnderPlayer != selectedBlock)) {
             if (!world.isRemote) {
                 openGui(player, world);
             }
