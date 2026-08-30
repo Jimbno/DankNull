@@ -56,6 +56,10 @@ Original 1.12.2 mod by **TheRealp455w0rd**, MIT licensed
 ([source](https://github.com/p455w0rds-MC-Mods/DankNull)). Backport built on the GTNH
 [ExampleMod1.7.10](https://github.com/GTNewHorizons/ExampleMod1.7.10) buildscript.
 
+All models and textures in this build are by **Jimbno** and original to the backport — the OBJ models, the
+GUI sheets, the item sprites and the dock texture were all redrawn, so none of the original mod's art is
+reused here.
+
 ## License
 
 MIT — see [`LICENSE`](LICENSE), which carries two copyright notices.
