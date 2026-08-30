@@ -112,9 +112,9 @@ public class DankNullDockItemRenderer implements IItemRenderer {
             .bindTexture(TextureMap.locationBlocksTexture);
         final Tessellator tessellator = Tessellator.instance;
         tessellator.startDrawingQuads();
-        // No world lighting to sample outside the chunk pass.
+        // No world lighting to sample outside the chunk pass; emit() still applies directional shading, which is
+        // what keeps the inventory icon reading as a solid shape rather than a flat silhouette.
         tessellator.setBrightness(BRIGHT);
-        tessellator.setColorOpaque_F(1.0F, 1.0F, 1.0F);
         DankNullDockRenderer.emit(tessellator, model, icon, DankNullDockRenderer.AUTHORED_FACING, 0.0D, 0.0D, 0.0D);
         tessellator.draw();
     }

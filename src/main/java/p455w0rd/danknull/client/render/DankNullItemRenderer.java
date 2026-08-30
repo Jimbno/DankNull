@@ -37,8 +37,8 @@ import p455w0rd.danknull.util.DankNullUtils;
  * </p>
  *
  * <p>
- * Geometry is emitted centred on the origin, which is the
- * convention every vanilla "block as item" path is calibrated for. {@code shouldUseRenderHelper} therefore returns
+ * Geometry is emitted centred on the origin, the convention every vanilla "block as item" path is calibrated
+ * for. {@code shouldUseRenderHelper} therefore returns
  * {@code true} throughout so Forge applies its block-shaped helper transforms, and the single case where those
  * assume 0..1 instead ({@code EQUIPPED_BLOCK} pre-translates by -0.5) is compensated in
  * {@link #renderItem(ItemRenderType, ItemStack, Object...)}.
@@ -244,10 +244,12 @@ public class DankNullItemRenderer implements IItemRenderer {
             OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ZERO);
             GL11.glEnable(GL12.GL_RESCALE_NORMAL);
 
-            // Three passes, so the contained stack sits inside the box rather than in front of it.
+            // Four passes, so the contained stack sits inside the box rather than in front of it.
             // 1. the opaque frame, writing depth, so its bars correctly hide whatever is behind them;
             // 2. the contained stack, depth-tested against that frame;
             // 3. the glass, depth-tested but with depth writes off, so it tints the stack instead of hiding it.
+            // 4. the glint over the frame bars, which is a depth-EQUAL overlay and so needs the depth buffer to
+            // still hold what pass 1 wrote - true here because passes 2 and 3 only ever add nearer geometry.
             // The shell passes are wrapped so their scaling does not reach the contained stack, which positions
             // itself in unscaled, origin-centred space.
             renderObjShell(model, OBJ_TEXTURE, OBJ_FRAME_PARTS);
@@ -270,6 +272,12 @@ public class DankNullItemRenderer implements IItemRenderer {
                     GL11.glDepthMask(true);
                     GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
                 }
+            }
+
+            if (stack.hasEffect(0)) {
+                // Frame only. The pane is already a tier-tinted overlay, and the contained stack belongs to
+                // whatever item is stored - gilding either would be claiming an enchantment that is not there.
+                renderGlint(stack, model, OBJ_FRAME_PARTS);
             }
         } finally {
             GL11.glPopAttrib();

@@ -91,8 +91,8 @@ public class DankNullDockRenderer implements ISimpleBlockRenderingHandler {
         }
         // Fetched here rather than cached: off-thread chunk builds each have their own instance.
         final Tessellator tessellator = TessellatorManager.get();
+        // Per-block light level; emit() applies the per-face directional shading on top of it.
         tessellator.setBrightness(block.getMixedBrightnessForBlock(world, x, y, z));
-        tessellator.setColorOpaque_F(1.0F, 1.0F, 1.0F);
         // The model is centred on the block's footprint, so it is emitted about the centre of x/z.
         emit(tessellator, model, icon, world.getBlockMetadata(x, y, z) & 3, x + 0.5D, y, z + 0.5D);
         return true;
@@ -116,8 +116,14 @@ public class DankNullDockRenderer implements ISimpleBlockRenderingHandler {
                     face.faceNormal = face.calculateFaceNormal();
                 }
                 final Vertex normal = face.faceNormal;
-                tessellator
-                    .setNormal(rotateX(normal.x, normal.z, facing), normal.y, rotateZ(normal.x, normal.z, facing));
+                final float nx = rotateX(normal.x, normal.z, facing);
+                final float nz = rotateZ(normal.x, normal.z, facing);
+                tessellator.setNormal(nx, normal.y, nz);
+                // Without this every face takes the same colour and the model reads as flat and unlit. Chunk
+                // geometry is not lit by GL lighting - RenderBlocks bakes the directional falloff into vertex
+                // colour instead, and an ISBRH has to do the same or it stands out against every other block.
+                final float shade = faceShade(nx, normal.y, nz);
+                tessellator.setColorOpaque_F(shade, shade, shade);
 
                 final TextureCoordinate[] uvs = face.textureCoordinates;
                 for (int i = 0; i < 4; i++) {
@@ -142,6 +148,19 @@ public class DankNullDockRenderer implements ISimpleBlockRenderingHandler {
                 }
             }
         }
+    }
+
+    /**
+     * Vanilla's per-face brightness multipliers, from {@code RenderBlocks}: full for an up-facing surface, 0.5
+     * down, 0.8 along z and 0.6 along x. A face that is not axis-aligned takes the value of whichever axis it
+     * leans towards, which is the closest this model gets to vanilla's behaviour without per-vertex AO.
+     */
+    private static float faceShade(final float nx, final float ny, final float nz) {
+        final float ax = Math.abs(nx), ay = Math.abs(ny), az = Math.abs(nz);
+        if (ay >= ax && ay >= az) {
+            return ny > 0.0F ? 1.0F : 0.5F;
+        }
+        return az >= ax ? 0.8F : 0.6F;
     }
 
     /**
