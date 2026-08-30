@@ -52,16 +52,20 @@ as a numeric short where 1.12 wrote a `"modid:name"` string.
 
 ## Credits
 
-Original 1.12.2 mod by **p455w0rd** (TheRealp455w0rd). Backport built on the GTNH
+Original 1.12.2 mod by **TheRealp455w0rd**, MIT licensed
+([source](https://github.com/p455w0rds-MC-Mods/DankNull)). Backport built on the GTNH
 [ExampleMod1.7.10](https://github.com/GTNewHorizons/ExampleMod1.7.10) buildscript.
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE). That covers the backport: the 1.7.10 port itself, the rendering pipeline,
-the build setup and the tooling in `tools/`.
+MIT — see [`LICENSE`](LICENSE), which carries two copyright notices.
 
-One caveat worth stating plainly. This is a port of p455w0rd's `/dank/null`, and the
-[upstream repository](https://github.com/p455w0rd/DankNull) ships no license file, which by default means
-its author reserves their rights rather than granting them. MIT here is a statement about this work; it
-cannot grant permissions over the original that its author has not granted. If you intend to distribute
-builds — to a modpack, or anywhere public — get explicit permission from p455w0rd first.
+The original `/dank/null` is MIT: the upstream repository added the licence in commit `6c7f8fb`
+(2018-01-06) as *Copyright (c) 2018 TheRealp455w0rd*, and the mod's
+[CurseForge page](https://www.curseforge.com/minecraft/mc-mods/dank-null) lists MIT as well. The file sits
+on upstream's `master` branch and not on the `1.12` branch this port was taken from, which is only a
+branch-layout quirk — the two are separate lines of history — and does not narrow the grant.
+
+MIT is a real permission to port and redistribute, with one obligation: the copyright notice and
+permission notice must travel with the code. That is why `LICENSE` names both TheRealp455w0rd for the
+original and the backport author for this work, and why it should stay intact in any jar or repackaging.
