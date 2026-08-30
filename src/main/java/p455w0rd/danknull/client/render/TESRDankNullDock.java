@@ -28,6 +28,15 @@ import p455w0rd.danknull.util.DankNullStackUtils;
  */
 public class TESRDankNullDock extends TileEntitySpecialRenderer {
 
+    /**
+     * Where the docked /dank/null sits, taken from the {@code dankerino} reference group in the Blockbench dock
+     * project: that group is the item model translated up by 0.375, spanning y 0.375..1.125 at full size.
+     * {@link DankNullItemRenderer#renderDankNull} draws a one-block-tall model centred on the origin, so
+     * reproducing that envelope means scaling to its 0.75 height and centring at 0.75.
+     */
+    private static final double DOCKED_ITEM_SCALE = 0.75D;
+    private static final double DOCKED_ITEM_CENTRE_Y = 0.75D;
+
     private final DankNullItemRenderer itemRenderer = new DankNullItemRenderer();
 
     @Override
@@ -46,8 +55,8 @@ public class TESRDankNullDock extends TileEntitySpecialRenderer {
 
         GL11.glPushMatrix();
         try {
-            GL11.glTranslated(x + 0.5D, y + 0.4D, z + 0.5D);
-            GL11.glScaled(0.5D, 0.5D, 0.5D);
+            GL11.glTranslated(x + 0.5D, y + DOCKED_ITEM_CENTRE_Y, z + 0.5D);
+            GL11.glScaled(DOCKED_ITEM_SCALE, DOCKED_ITEM_SCALE, DOCKED_ITEM_SCALE);
 
             // Light the floating item from the block space above the dock rather than from whatever the previous
             // TESR happened to leave bound; 1.12 got this for free from the item renderer's own lighting pass.
