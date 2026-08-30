@@ -19,6 +19,9 @@
  *     is computed rather than assumed so a texture resize does not silently skew every UV.
  *  4. Degenerate faces. Zero-area quads only produce z-fighting, so they are dropped.
  *
+ * The dock body is entirely on DankDock.png - Dank.png appears in the export only for the `dankerino`
+ * reference group, which is skipped - so a single block sprite still covers it.
+ *
  * The texture is installed as a block sprite (textures/blocks/dock/base.png) because the body is drawn into the
  * chunk mesh from the terrain atlas, not with its own bound texture.
  *
@@ -36,7 +39,7 @@ const ASSETS = path.join(ROOT, 'src/main/resources/assets/danknull');
 
 const OBJ = path.join(SRC, 'DankDock.obj');
 const BB = path.join(SRC, 'DankDock.bbmodel');
-const TEX = path.join(SRC, 'texture.png');
+const TEX = path.join(SRC, 'DankDock.png');
 
 /** Groups that make up the dock body; everything else in the export is reference geometry. */
 const BODY_GROUP = 'cube';

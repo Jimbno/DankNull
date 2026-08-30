@@ -128,12 +128,23 @@ public class DankNullItemRenderer implements IItemRenderer {
     private static final float GLINT_TEXTURE_SCALE = 8.0F;
 
     /**
-     * {@code GL_OBJECT_PLANE} coefficients: s is taken from object-space x and t from object-space y. Allocated
-     * once - {@code glTexGen} reads from the buffer's current position, so both are rewound before every use.
+     * {@code GL_OBJECT_PLANE} coefficients, deliberately skewed across all three axes.
+     *
+     * <p>
+     * A generated coordinate is the dot product of the vertex position with its plane, so it stays <i>constant</i>
+     * across any face whose normal is parallel to that plane's direction. Taking s straight from x and t from y
+     * therefore degenerates on four of a boxy model's six face directions - one coordinate stops varying and the
+     * glint smears into stretched streaks instead of a sweep. Skewing both planes so neither lines up with an axis
+     * keeps every axis-aligned face varying in both s and t.
+     * </p>
+     *
+     * <p>
+     * Allocated once - {@code glTexGen} reads from the buffer's current position, so both are rewound before use.
+     * </p>
      */
-    private static final FloatBuffer S_PLANE = asPlane(1.0F, 0.0F, 0.0F, 0.0F);
+    private static final FloatBuffer S_PLANE = asPlane(1.0F, 0.35F, 0.6F, 0.0F);
 
-    private static final FloatBuffer T_PLANE = asPlane(0.0F, 1.0F, 0.0F, 0.0F);
+    private static final FloatBuffer T_PLANE = asPlane(-0.5F, 1.0F, 0.4F, 0.0F);
 
     private static FloatBuffer asPlane(final float a, final float b, final float c, final float d) {
         final FloatBuffer buffer = BufferUtils.createFloatBuffer(4);
@@ -481,8 +492,9 @@ public class DankNullItemRenderer implements IItemRenderer {
      * </p>
      *
      * <p>
-     * {@code GL_OBJECT_LINEAR} generates s and t from the vertex's object-space x and y, which is continuous over
-     * the whole model however its faces are unwrapped. Object space is pre-modelview, so the planes are unaffected
+     * {@code GL_OBJECT_LINEAR} generates s and t from the vertex position instead, which is continuous over the
+     * whole model however its faces are unwrapped; see {@link #S_PLANE} for why the planes are skewed. Object space is
+     * pre-modelview, so the planes are unaffected
      * by {@link #renderObjShell}'s scaling and by whatever transform the render type applied - the sweep stays put
      * relative to the model. Angelica tracks {@code GL_TEXTURE_GEN_S}/{@code _T} and redirects {@code glTexGen*},
      * so this is safe under its state manager.
