@@ -31,14 +31,13 @@ import p455w0rd.danknull.util.DankNullUtils;
  *
  * <p>
  * 1.12 wrapped the item's baked model in p455w0rdslib's {@code ItemLayerWrapper} and drew it from a
- * {@code TileEntityItemStackRenderer}. Neither exists here, so the 14-element JSON box model
- * ({@code models/item/dank_null_N.json}, frame plus a per-tier coloured glass pane) is baked through GTNHLib and
- * drawn from a plain 1.7.10 {@link IItemRenderer} - see {@link JsonItemModel} for why that route is the only one
- * available to a non-{@code ItemBlock}.
+ * {@code TileEntityItemStackRenderer}. Neither exists here, so the model is a Blockbench OBJ loaded through
+ * Forge's own {@code AdvancedModelLoader} and drawn from a plain 1.7.10 {@link IItemRenderer} - an opaque frame
+ * pass, the contained stack, then a per-tier tinted glass pass.
  * </p>
  *
  * <p>
- * Geometry is emitted centred on the origin (the JSON 0..1 cube shifted by -0.5 on every axis), which is the
+ * Geometry is emitted centred on the origin, which is the
  * convention every vanilla "block as item" path is calibrated for. {@code shouldUseRenderHelper} therefore returns
  * {@code true} throughout so Forge applies its block-shaped helper transforms, and the single case where those
  * assume 0..1 instead ({@code EQUIPPED_BLOCK} pre-translates by -0.5) is compensated in
@@ -71,9 +70,8 @@ public class DankNullItemRenderer implements IItemRenderer {
     /** OBJ shell, loaded via Forge's own AdvancedModelLoader - no GTNHLib needed for this path. */
     private static final String OBJ_MODEL = "models/dank_null.obj";
 
-    private static final ResourceLocation OBJ_TEXTURE = new ResourceLocation(
-        ModGlobals.MODID,
-        "textures/models/dank_null.png");
+    /** Shared with {@link DankNullPanelRenderer}. */
+    static final ResourceLocation OBJ_TEXTURE = new ResourceLocation(ModGlobals.MODID, "textures/models/dank_null.png");
 
     /** Height of the OBJ in Blockbench pixels; it is modelled y 0..OBJ_PIXELS/16 rather than origin-centred. */
     private static final float OBJ_PIXELS = 12.0F;
@@ -92,7 +90,8 @@ public class DankNullItemRenderer implements IItemRenderer {
 
     private static final float OBJ_HALF_HEIGHT = OBJ_PIXELS / 32.0F;
 
-    private static final ResourceLocation OBJ_GLASS_TEXTURE = new ResourceLocation(
+    /** Shared with {@link DankNullPanelRenderer}: panels are the same framed-glass shape on the same textures. */
+    static final ResourceLocation OBJ_GLASS_TEXTURE = new ResourceLocation(
         ModGlobals.MODID,
         "textures/models/dank_null_glass.png");
 
@@ -199,8 +198,7 @@ public class DankNullItemRenderer implements IItemRenderer {
      * sampling whatever sprite happened to be there.
      * </p>
      */
-    private static void renderObjShell(final ObjItemModel model, final ResourceLocation texture,
-        final String... parts) {
+    static void renderObjShell(final ObjItemModel model, final ResourceLocation texture, final String... parts) {
         Minecraft.getMinecraft()
             .getTextureManager()
             .bindTexture(texture);
@@ -403,7 +401,7 @@ public class DankNullItemRenderer implements IItemRenderer {
      * {@code GL_COLOR_BUFFER_BIT} attribute push in {@link #renderDankNull}, so all four are restored by hand.
      * </p>
      */
-    void renderGlint(final ItemStack stack, final JsonItemModel model) {
+    void renderGlint(final ItemStack stack, final ObjItemModel model, final String... parts) {
         final DankNullTier tier = ItemDankNull.getTier(stack);
         final int color;
         final float intensity;
@@ -429,8 +427,8 @@ public class DankNullItemRenderer implements IItemRenderer {
         GL11.glColor4f(red, green, blue, 1.0F);
         GL11.glMatrixMode(GL11.GL_TEXTURE);
         try {
-            glintPass(model, scroll(3000L), -50.0F);
-            glintPass(model, -scroll(4873L), 10.0F);
+            glintPass(model, scroll(3000L), -50.0F, parts);
+            glintPass(model, -scroll(4873L), 10.0F, parts);
         } finally {
             GL11.glMatrixMode(GL11.GL_MODELVIEW);
             OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ZERO);
@@ -448,13 +446,25 @@ public class DankNullItemRenderer implements IItemRenderer {
      * translation by the scale. Vanilla's 0.125 scale plus an 8x offset works out to the same one-unit-per-period
      * scroll.
      */
-    private void glintPass(final JsonItemModel model, final float offset, final float rotation) {
+    private void glintPass(final ObjItemModel model, final float offset, final float rotation, final String... parts) {
         GL11.glPushMatrix();
         try {
             GL11.glScalef(GLINT_TEXTURE_SCALE, GLINT_TEXTURE_SCALE, GLINT_TEXTURE_SCALE);
             GL11.glTranslatef(offset / GLINT_TEXTURE_SCALE, 0.0F, 0.0F);
             GL11.glRotatef(rotation, 0.0F, 0.0F, 1.0F);
-            model.render(-0.5F, -0.5F, -0.5F, JsonItemModel.Pass.ALL, true);
+            // The glint texture is already bound and the texture matrix is live, so this only has to re-emit the
+            // same geometry; the model's own UVs then sample the glint sheet. The modelview transform has to match
+            // renderObjShell's exactly or the overlay would not sit on the surface it is meant to gild.
+            GL11.glMatrixMode(GL11.GL_MODELVIEW);
+            GL11.glPushMatrix();
+            try {
+                GL11.glScalef(OBJ_SCALE, OBJ_SCALE, OBJ_SCALE);
+                GL11.glTranslatef(0.0F, -OBJ_HALF_HEIGHT, 0.0F);
+                model.renderOnly(parts);
+            } finally {
+                GL11.glPopMatrix();
+                GL11.glMatrixMode(GL11.GL_TEXTURE);
+            }
         } finally {
             GL11.glPopMatrix();
         }

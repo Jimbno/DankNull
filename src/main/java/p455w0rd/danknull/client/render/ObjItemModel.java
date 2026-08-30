@@ -14,7 +14,7 @@ import p455w0rd.danknull.DankNull;
  * A Wavefront OBJ model, loaded through Forge's own {@link AdvancedModelLoader}.
  *
  * <p>
- * Unlike {@link JsonItemModel} this needs no third-party library: OBJ support is built into Forge 1.7.10. That
+ * This needs no third-party library: OBJ support is built into Forge 1.7.10. That
  * matters for packs outside GTNH, where GTNHLib is not just another jar but a coremod pulling in GTNHExtLib and a
  * mixin provider.
  * </p>

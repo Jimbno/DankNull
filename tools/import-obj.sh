@@ -32,6 +32,7 @@ RES=$(grep -oE '"resolution":\{"width":[0-9]+' "$SRC/DANK.bbmodel" | grep -oE '[
 TEX=$(png_width "$SRC/Dank.png")
 echo "project resolution ${RES}, main texture ${TEX}px -> UV factor ${RES}/${TEX}"
 
+convert() { # $1 = source .obj, $2 = destination .obj
 awk -v f="$RES" -v t="$TEX" '
 BEGIN { k = f / t }
 NR==FNR { if ($1=="v")  { nv++; px[nv]=sprintf("%.4f,%.4f,%.4f",$2+0,$3+0,$4+0) }
@@ -51,15 +52,39 @@ NR==FNR { if ($1=="v")  { nv++; px[nv]=sprintf("%.4f,%.4f,%.4f",$2+0,$3+0,$4+0) 
         print; next }
 { print }
 END { printf "dropped %d zero-area faces, %d out-of-range glass backfaces\n", drop1, drop2 > "/dev/stderr" }
-' "$SRC/DANK.obj" "$SRC/DANK.obj" > "$ASSETS/models/dank_null.obj"
+' "$1" "$1" > "$2"
+}
+
+# The /dank/null and the panels are separate Blockbench projects sharing both textures, so they need identical UV
+# treatment; the only structural difference is that a panel has no contained stack.
+convert "$SRC/DANK.obj"      "$ASSETS/models/dank_null.obj"
+convert "$SRC/DankPanel.obj" "$ASSETS/models/dank_null_panel.obj"
 
 cp "$SRC/Dank.png"  "$ASSETS/textures/models/dank_null.png"
 cp "$SRC/glass.png" "$ASSETS/textures/models/dank_null_glass.png"
 
-echo "per-group UV ranges (all should sit within 0..1):"
-awk '/^o /{g=substr($0,3)} /^vt /{n++;U[n]=$2;V[n]=$3}
-/^f /{c[g]++; for(i=2;i<=NF;i++){split($i,p,"/"); q=p[2]+0; if(q>0){u=U[q];v=V[q]
-  if(!(g in s)||u<a[g])a[g]=u; if(!(g in s)||u>b[g])b[g]=u
-  if(!(g in s)||v<x[g])x[g]=v; if(!(g in s)||v>y[g])y[g]=v; s[g]=1}}}
-END{for(g in s) printf "  %-12s faces=%-3d U %.2f..%.2f  V %.2f..%.2f\n", g, c[g], a[g],b[g], x[g],y[g]}' \
-  "$ASSETS/models/dank_null.obj" | sort
+# Every group must sit within 0..1: these UVs address the model's own bound texture, so anything outside would
+# wrap rather than clamp.
+report() {
+  echo "$2:"
+  awk '
+    /^o /  { g = substr($0, 3) }
+    /^vt / { n++; U[n] = $2; V[n] = $3 }
+    /^f /  { c[g]++
+             for (i = 2; i <= NF; i++) {
+               split($i, p, "/"); q = p[2] + 0
+               if (q > 0) {
+                 u = U[q]; v = V[q]
+                 if (!(g in seen) || u < a[g]) a[g] = u
+                 if (!(g in seen) || u > b[g]) b[g] = u
+                 if (!(g in seen) || v < x[g]) x[g] = v
+                 if (!(g in seen) || v > y[g]) y[g] = v
+                 seen[g] = 1
+               }
+             } }
+    END    { for (g in seen) print sprintf("  %-12s faces=%-3d U %.2f..%.2f  V %.2f..%.2f", g, c[g], a[g], b[g], x[g], y[g]) }
+  ' "$1" | sort
+}
+
+report "$ASSETS/models/dank_null.obj"       dank_null
+report "$ASSETS/models/dank_null_panel.obj" dank_null_panel
