@@ -1,7 +1,6 @@
 package p455w0rd.danknull.items;
 
 import java.util.List;
-import java.util.Locale;
 
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
@@ -15,7 +14,6 @@ import net.minecraft.item.ItemSlab;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.MathHelper;
-import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.StatCollector;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
@@ -30,7 +28,6 @@ import p455w0rd.danknull.api.DankNullItemModes.ItemPlacementMode;
 import p455w0rd.danknull.api.IDankNullHandler;
 import p455w0rd.danknull.init.ModConfig.Options;
 import p455w0rd.danknull.init.ModCreativeTab;
-import p455w0rd.danknull.init.ModGlobals;
 import p455w0rd.danknull.init.ModGlobals.DankNullTier;
 import p455w0rd.danknull.init.ModGuiHandler;
 import p455w0rd.danknull.util.DankNullStackUtils;
@@ -43,14 +40,6 @@ import p455w0rd.danknull.util.DankNullUtils;
 // MinecraftForgeClient.registerItemRenderer. See client/render/.
 // Deliberately no registerIcons/getIcon here - there is no flat dank_null_N.png sprite to bind.
 public class ItemDankNull extends Item {
-
-    /** Sprite/texture name of the shared frame layer ({@code #0} in the 1.12 model). */
-    public static final String FRAME_TEXTURE = ModGlobals.MODID + ":blocks/danknull/frame";
-
-    /** Full resource path of the shared frame layer, for direct texture binding. */
-    public static final ResourceLocation FRAME_TEXTURE_LOCATION = new ResourceLocation(
-        ModGlobals.MODID,
-        "textures/blocks/danknull/frame.png");
 
     private final DankNullTier tier;
 
@@ -65,24 +54,6 @@ public class ItemDankNull extends Item {
 
     public DankNullTier getTier() {
         return tier;
-    }
-
-    /** Lower-case tier name used by the glass texture files (redstone, lapis, iron, ...). */
-    public String getTierTextureName() {
-        return tier.name()
-            .toLowerCase(Locale.ENGLISH);
-    }
-
-    /** Sprite/texture name of this tier's glass layer ({@code #1} in the 1.12 model). */
-    public String getGlassTexture() {
-        return ModGlobals.MODID + ":blocks/danknull/glass_" + getTierTextureName();
-    }
-
-    /** Full resource path of this tier's glass layer, for direct texture binding. */
-    public ResourceLocation getGlassTextureLocation() {
-        return new ResourceLocation(
-            ModGlobals.MODID,
-            "textures/blocks/danknull/glass_" + getTierTextureName() + ".png");
     }
 
     public static boolean isDankNull(final ItemStack stack) {

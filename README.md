@@ -55,9 +55,13 @@ as a numeric short where 1.12 wrote a `"modid:name"` string.
 Original 1.12.2 mod by **p455w0rd** (TheRealp455w0rd). Backport built on the GTNH
 [ExampleMod1.7.10](https://github.com/GTNewHorizons/ExampleMod1.7.10) buildscript.
 
-## Licensing note
+## License
 
-`LICENSE` is currently the MIT license inherited from the ExampleMod template and still carries the
-template author's copyright line. The upstream `/dank/null` repository ships no license file, so the terms
-under which this backport may be redistributed have not been settled — resolve this before publishing
-builds.
+MIT — see [`LICENSE`](LICENSE). That covers the backport: the 1.7.10 port itself, the rendering pipeline,
+the build setup and the tooling in `tools/`.
+
+One caveat worth stating plainly. This is a port of p455w0rd's `/dank/null`, and the
+[upstream repository](https://github.com/p455w0rd/DankNull) ships no license file, which by default means
+its author reserves their rights rather than granting them. MIT here is a statement about this work; it
+cannot grant permissions over the original that its author has not granted. If you intend to distribute
+builds — to a modpack, or anywhere public — get explicit permission from p455w0rd first.
