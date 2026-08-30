@@ -1,5 +1,7 @@
 package p455w0rd.danknull.client.render;
 
+import java.nio.FloatBuffer;
+
 import net.minecraft.block.Block;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.ItemRenderer;
@@ -13,6 +15,7 @@ import net.minecraft.util.IIcon;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.client.IItemRenderer;
 
+import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
 
@@ -114,16 +117,33 @@ public class DankNullItemRenderer implements IItemRenderer {
         "textures/misc/enchanted_item_glint.png");
 
     /**
-     * How far the glint sheet is stretched across the model, in atlas-UV units.
+     * How many times the glint sheet repeats across the model.
      *
      * <p>
-     * Vanilla's glint passes re-draw a <em>fresh</em> quad with UVs 0..1 and shrink them with a 0.125 texture
-     * matrix. There is no fresh quad here - the glint is the model's own geometry re-drawn - so the UVs coming in
-     * are block-atlas coordinates, and upstream's {@code GlintEffectRenderer} scale of 8 is the equivalent: it
-     * blows the sliver of atlas the model occupies up to a usable fraction of the glint sheet.
+     * The coordinates it scales are now object-space positions (see {@link #enableGlintCoordGen}), so this is read
+     * directly in model units: the /dank/null is 0.75 units across, so 8 puts roughly six repeats over it. That is
+     * upstream {@code GlintEffectRenderer}'s value, which scaled its texture matrix by the same 8.
      * </p>
      */
-    private static final float GLINT_TEXTURE_SCALE = 0.125F;
+    private static final float GLINT_TEXTURE_SCALE = 8.0F;
+
+    /**
+     * {@code GL_OBJECT_PLANE} coefficients: s is taken from object-space x and t from object-space y. Allocated
+     * once - {@code glTexGen} reads from the buffer's current position, so both are rewound before every use.
+     */
+    private static final FloatBuffer S_PLANE = asPlane(1.0F, 0.0F, 0.0F, 0.0F);
+
+    private static final FloatBuffer T_PLANE = asPlane(0.0F, 1.0F, 0.0F, 0.0F);
+
+    private static FloatBuffer asPlane(final float a, final float b, final float c, final float d) {
+        final FloatBuffer buffer = BufferUtils.createFloatBuffer(4);
+        buffer.put(a)
+            .put(b)
+            .put(c)
+            .put(d);
+        buffer.flip();
+        return buffer;
+    }
 
     /** Vanilla's {@code f7}: the glint colour is dimmed to 76% before being drawn additively. */
     private static final float GLINT_DIM = 0.76F;
@@ -433,11 +453,13 @@ public class DankNullItemRenderer implements IItemRenderer {
         GL11.glEnable(GL11.GL_BLEND);
         OpenGlHelper.glBlendFunc(GL11.GL_SRC_COLOR, GL11.GL_ONE, GL11.GL_ONE, GL11.GL_ZERO);
         GL11.glColor4f(red, green, blue, 1.0F);
+        enableGlintCoordGen();
         GL11.glMatrixMode(GL11.GL_TEXTURE);
         try {
             glintPass(model, scroll(3000L), -50.0F, parts);
             glintPass(model, -scroll(4873L), 10.0F, parts);
         } finally {
+            disableGlintCoordGen();
             GL11.glMatrixMode(GL11.GL_MODELVIEW);
             OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ZERO);
             GL11.glDepthMask(true);
@@ -449,10 +471,43 @@ public class DankNullItemRenderer implements IItemRenderer {
     }
 
     /**
+     * Derives the glint's texture coordinates from vertex position instead of the model's own UVs.
+     *
+     * <p>
+     * Re-drawing the model through a scrolled texture matrix - which is what upstream's
+     * {@code GlintEffectRenderer} did, and what this did before - samples the glint sheet through whatever UVs the
+     * model carries. Those UVs are a packed atlas layout, so every face pulls a different island out of the sheet
+     * and the glint breaks at each texture seam instead of sweeping across the model.
+     * </p>
+     *
+     * <p>
+     * {@code GL_OBJECT_LINEAR} generates s and t from the vertex's object-space x and y, which is continuous over
+     * the whole model however its faces are unwrapped. Object space is pre-modelview, so the planes are unaffected
+     * by {@link #renderObjShell}'s scaling and by whatever transform the render type applied - the sweep stays put
+     * relative to the model. Angelica tracks {@code GL_TEXTURE_GEN_S}/{@code _T} and redirects {@code glTexGen*},
+     * so this is safe under its state manager.
+     * </p>
+     */
+    private static void enableGlintCoordGen() {
+        GL11.glEnable(GL11.GL_TEXTURE_GEN_S);
+        GL11.glEnable(GL11.GL_TEXTURE_GEN_T);
+        GL11.glTexGeni(GL11.GL_S, GL11.GL_TEXTURE_GEN_MODE, GL11.GL_OBJECT_LINEAR);
+        GL11.glTexGeni(GL11.GL_T, GL11.GL_TEXTURE_GEN_MODE, GL11.GL_OBJECT_LINEAR);
+        S_PLANE.rewind();
+        T_PLANE.rewind();
+        GL11.glTexGen(GL11.GL_S, GL11.GL_OBJECT_PLANE, S_PLANE);
+        GL11.glTexGen(GL11.GL_T, GL11.GL_OBJECT_PLANE, T_PLANE);
+    }
+
+    private static void disableGlintCoordGen() {
+        GL11.glDisable(GL11.GL_TEXTURE_GEN_S);
+        GL11.glDisable(GL11.GL_TEXTURE_GEN_T);
+    }
+
+    /**
      * One glint pass. The texture matrix is already the current matrix; {@code offset} is the net scroll in texture
      * units, and is divided back out by the scale because {@code glScalef} then {@code glTranslatef} multiplies the
-     * translation by the scale. Vanilla's 0.125 scale plus an 8x offset works out to the same one-unit-per-period
-     * scroll.
+     * translation by the scale - so the sheet still advances one unit per period whatever the scale is.
      */
     private void glintPass(final ObjItemModel model, final float offset, final float rotation, final String... parts) {
         GL11.glPushMatrix();
